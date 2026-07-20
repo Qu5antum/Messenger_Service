@@ -45,6 +45,7 @@ class User(Base):
     )
     role: Mapped[UserRole] = mapped_column(default=UserRole.USER)
     phone_number: Mapped[str] = mapped_column(nullable=False)
+    password: Mapped[str] = mapped_column(nullable=False)
 
     participation_in_chats: Mapped[list['ChatParticipant']] = relationship(back_populates="user")
     messages: Mapped[list["Message"]] = relationship(back_populates="sender")

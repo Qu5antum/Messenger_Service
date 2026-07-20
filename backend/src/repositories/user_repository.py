@@ -14,3 +14,11 @@ class UserRepository(BaseRepository):
         )
 
         return result.scalar_one_or_none()
+
+    async def get_user_id_by_phone_number(self, phone_number: str) -> Optional[User]:
+        result = await self.session.execute(
+            select(self.model.id).where(self.model.phone_number == phone_number)
+        )
+
+        return result.scalar_one_or_none()
+
