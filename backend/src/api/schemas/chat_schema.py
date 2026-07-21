@@ -17,3 +17,10 @@ class ChatResponse(BaseModel):
 	description: str
 
 	model_config = ConfigDict(from_attributes=True)
+
+
+class ChatUpdate(BaseModel):
+	title: Optional[str] = None
+	avatar: Optional[str] = None
+	description: Optional[str] = None
+	owner_id: Optional[UUID] = None

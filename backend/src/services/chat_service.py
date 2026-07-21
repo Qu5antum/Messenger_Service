@@ -1,13 +1,15 @@
 import logging
 from sqlalchemy.orm import IntegrityError
+from uuid import UUID
 
 from src.database.db import AsyncSession
 from src.database.models import User
-from src.api.schemas.chat_schema import ChatCreate, ChatResponse
+from src.api.schemas.chat_schema import ChatCreate, ChatResponse, ChatUpdate
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.user_repository import UserRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.exception_handlers.user_exceptions import UserNotFoundException
+from src.exception_handlers.chat_exception import ChatNotBelongToUserException, ChatNotFoundException
 from src.exception_handlers.db_exception import DatabaseException
 
 logger = logging.getLogger("auth")
@@ -81,35 +83,92 @@ class ChatService:
 
 		return new_private_chat
 
-		async def create_group_chat(chat: ChatCreate, user: User) -> ChatResponse:
-			try:
-				new_group_chat = await self.chat_repo.create(
-					is_group=True,
-					title= chat.title,
-					avatar=chat.title,
-					description=chat.description,
-					owner_id=user.id
-				)
+	async def create_group_chat(chat: ChatCreate, user: User) -> ChatResponse:
+		try:
+			new_group_chat = await self.chat_repo.create(
+				is_group=True,
+				title= chat.title,
+				avatar=chat.title,
+				description=chat.description,
+				owner_id=user.id
+			)
 
-				await self.session.commit()
+			await self.session.commit()
 
-			except IntegrityError:
-				await self.session.rollback()
+		except IntegrityError:
+			await self.session.rollback()
 
-				logger.error(
-					"Database error, chat not created",
-					exc_info=True,
-					extra={"user_id": str(user.id)}
-				)
-
-				raise DatabaseException("Database error, chat not created")
-
-			logger.info(
-				"New group chat created",
+			logger.error(
+				"Database error, chat not created",
+				exc_info=True,
 				extra={"user_id": str(user.id)}
 			)
 
-			return new_group_chat
+			raise DatabaseException("Database error, chat not created")
+
+		logger.info(
+			"New group chat created",
+			extra={"user_id": str(user.id)}
+		)
+
+		return new_group_chat
+
+	async def update_chat(self, chatId: UUID, chatUpdate: ChatUpdate, user: User) -> ChatResponse:
+		chat = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id)
+
+		if not chat:
+			logger.warning(
+				"Chat not found",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatNotFoundException("Chat not found")
+
+		if chatId != chat.id:
+			logger.warning(
+				"User not owner of this chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(user.id)
+				}
+			)
+
+			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
+
+		try:
+			data = chatUpdate.model_dump(exclude_unset=True)
+
+			update_chat = await self.chat_repo.update(
+				id=chatId,
+				data=data
+			)
+
+		except IntegrityError:
+			await self.session.rollback()
+
+			logger.error(
+				"Database error, chat not updated",
+				exc_info=True,
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(user.id)
+				}
+			)
+
+			raise DatabaseException("Chat not updated")
+
+		logger.info(
+			"Chat successfully updated",
+			extra={
+				"chat_id": str(chatId),
+				"user_id": str(user.id)
+			}
+		)
+
+		return update_chat
+
+
+
 
 
 
