@@ -4,6 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import datetime
 from enum import Enum
+from typing import Optional
 
 
 class UserRole(str, Enum):
@@ -49,6 +50,7 @@ class User(Base):
 
     participation_in_chats: Mapped[list['ChatParticipant']] = relationship(back_populates="user")
     messages: Mapped[list["Message"]] = relationship(back_populates="sender")
+    own_chats: Mapped[list['Chat']] = relationship(back_populates="owner")
 
 
 class Chat(Base):
@@ -58,6 +60,9 @@ class Chat(Base):
     title: Mapped[str | None]
     avatar: Mapped[str | None]
     description: Mapped[str | None]
+
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
+    owner: Mapped[Optional['User']] = relationship(back_populates="own_chats")
 
     chat_participants: Mapped[list['ChatParticipant']] = relationship(back_populates="chat")
     chat_messages: Mapped[list['Message']] = relationship(back_populates="chat", cascade="all, delete-orphan")
