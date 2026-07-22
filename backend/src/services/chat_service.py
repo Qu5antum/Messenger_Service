@@ -179,7 +179,7 @@ class ChatService:
 			)
 
 			raise ChatNotFoundException("Chat not found")
-			
+
 		chat = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
 
 		if not chat:
@@ -194,6 +194,11 @@ class ChatService:
 			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
 
 		await self.chat_repo.delete(id=chatId)
+
+		logger.info(
+			"Chat successfully deleted",
+			extra={"chat_id": str(chatId)}
+		)
 
 		return {"detail": "Chat successfully deleted"}
 

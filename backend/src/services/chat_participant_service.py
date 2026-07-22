@@ -8,7 +8,7 @@ from src.repositories.chat_repository import ChatRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.repositories.user_repository import UserRepository
 from src.exception_handlers.chat_exception import ChatNotFoundException, ChatNotBelongToUserException, ChatIsNotGroupException
-from src.exception_handlers.user_exceptions import UserNotFoundException, UserAlreadyParticipantInChatException
+from src.exception_handlers.user_exceptions import UserNotFoundException, UserAlreadyParticipantInChatException, UserNotParticipantInChatException
 from src.exception_handlers.db_exception import DatabaseException
 
 logger = logging.getLogger("chat_participant")
@@ -32,12 +32,15 @@ class ChatParticipantService:
 
 			raise UserNotFoundException("User not found")
 
-		userIsParticipant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=userId)
+		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=userId)
 
-		if userIsParticipant:
+		if chat_participant:
 			logger.warning(
 				"User already participant of the chat",
-				extra={"user_id": str(userId)}
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
 			)
 			
 			raise UserAlreadyParticipantInChatException("User already in the chat")
@@ -75,7 +78,7 @@ class ChatParticipantService:
 			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
 
 		try:
-			new_chat_participant = await self.chat_participant_repo.create(
+			await self.chat_participant_repo.create(
 				chat_id=chatId,
 				user_id=userId
 			)
@@ -100,6 +103,74 @@ class ChatParticipantService:
 		)
 
 		return {"detail": "New participant added to the chat"}
+
+	async def remove_paritcipant_from_chat(self, chatId: UUID, userId: UUID, current_user: User) -> dict[str, str]:
+		user = await self.user_repo.get(id=userId)
+
+		if not user:
+			logger.warning(
+				"User not found by id",
+				extra={"user_id": str(userId)}
+			)
+
+			raise UserNotFoundException("User not found")
+
+		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=userId)
+
+		if not chat_participant:
+			logger.warning(
+				"User not participant in this chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
+			
+			raise UserNotParticipantInChatException("User not participant in this chat")
+
+		chat = await self.chat_repo.get(id=chatId)
+
+		if not chat:
+			logger.warning(
+				"Chat not found",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatNotFoundException("Chat not found")
+
+		if not chat.is_group:
+			logger.warning(
+				"Chat is private, not group chat",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatIsNotGroupException("Chat is not group, you can't add participant")
+
+		chatOfUser = await self.chat_repo.get_chat_by_owner_id(owner_id=current_user.id, chat_id=chatId)
+
+		if not chatOfUser:
+			logger.warning(
+				"User not owner of this chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
+
+			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
+
+		await self.chat_participant_repo.delete(id=chat_participant.id)
+
+		logger.info(
+			"User successfully removed from the chat",
+			extra={
+				"chat_id": str(chatId),
+				"user_id": str(current_user.id)
+			}
+		)
+
+		return {"detail": "User removed from the chat"}
+
 
 
 
