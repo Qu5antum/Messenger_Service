@@ -19,10 +19,13 @@ class ChatParticipantRepository(BaseRepository):
 
 		return result.scalar_one_or_none()
 
-	async def get_chat_participant_by_user_id(self, userId: UUID):
+	async def get_chat_participant_by_user_id(self, userId: UUID, chatId: UUID):
 		result = await self.session.execute(
 			select(self.model)
-			.where(self.model.user_id == userId)
+			.where(
+				self.model.user_id == userId,
+				self.model.chat_id == chatId
+			)
 		)
 
 		return result.scalar_one_or_none()
@@ -31,6 +34,14 @@ class ChatParticipantRepository(BaseRepository):
 		result = await self.session.execute(
 			select(self.model)
 			.where(self.model.chat_id == chatId)
+		)
+
+		return result.scalars().all()
+
+	async def get_user_participant_in_chats(self, userId: UUID):
+		result = await self.session.execute(
+			select(self.model)
+			.where(self.model.user_id == userId)
 		)
 
 		return result.scalars().all()

@@ -202,21 +202,28 @@ class ChatService:
 
 		return {"detail": "Chat successfully deleted"}
 
+	async def get_chat_by_id(self, chatId: UUID) -> ChatResponse: 
+		# implement redis service
+		chat = await self.chat_repo.get(id=chatId)
 
+		logger.info(
+			"Successful response response",
+			extra={"chat_id": str(chatId)}
+		)
 
+		return chat
 
+	async def get_user_chats(self, user: User) -> list[ChatResponse]:
+		# implement redis service
+		chat_participants = await self.chat_participant_repo.get_user_participant_in_chats(userId=user.id)
 
+		chat_ids = [chat_id for chat_id in chat_participants.chat_id]
 
+		chats = await self.chat_repo.get_chats_by_ids(chatIds=chat_ids)
 
+		logger.info(
+			"Successful chat responses",
+			extra={"user_id": str(user.id)}
+		)
 
-
-
-
-
-
-
-
-
-
-
-
+		return chats

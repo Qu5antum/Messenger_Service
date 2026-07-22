@@ -33,7 +33,7 @@ class ChatParticipantService:
 
 			raise UserNotFoundException("User not found")
 
-		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=userId)
+		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=userId, chatId=chatId)
 
 		if chat_participant:
 			logger.warning(
@@ -116,7 +116,7 @@ class ChatParticipantService:
 
 			raise UserNotFoundException("User not found")
 
-		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=userId)
+		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=userId, chatId=chatId)
 
 		if not chat_participant:
 			logger.warning(
@@ -200,7 +200,7 @@ class ChatParticipantService:
 
 		return participants
 
-	async def leave_chat(self, chatId: UUID, current_user: User): 
+	async def leave_chat(self, chatId: UUID, current_user: User) -> dict[str, str]: 
 		chat = await self.chat_repo.get(id=chatId)
 		
 		if not chat:
@@ -211,7 +211,7 @@ class ChatParticipantService:
 
 			raise ChatNotFoundException("Chat not found")
 
-		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=current_user.id)
+		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=current_user.id, chatId=chatId)
 		
 		if not chat_participant:
 			logger.warning(
@@ -271,13 +271,3 @@ class ChatParticipantService:
 		)
 
 		return {"detail": "User successfully leaved from chat"}
-
-
-
-
-
-
-
-
-
-

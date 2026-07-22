@@ -20,3 +20,10 @@ class ChatRepository(BaseRepository):
 
 		return result.scalar_one_or_none()
 
+	async def get_chats_by_ids(self, chatIds: list[UUID]):
+		result = await self.session.execute(
+			select(self.model)
+			.where(self.model.id.in_(chatIds))
+		)
+
+		return result.scalars().all()
