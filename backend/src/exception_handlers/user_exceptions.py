@@ -17,3 +17,8 @@ class UserAlreadyExists(BaseAppException):
     """Called if the user already exists."""
     def __init__(self, message: str):
         super().__init__(message, status_code=400)
+
+
+class UserAlreadyParticipantInChatException(BaseAppException):
+    def __init__(self, message: str):
+        super().__init__(message, status_code=400)

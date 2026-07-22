@@ -12,7 +12,7 @@ from src.exception_handlers.user_exceptions import UserNotFoundException
 from src.exception_handlers.chat_exception import ChatNotBelongToUserException, ChatNotFoundException
 from src.exception_handlers.db_exception import DatabaseException
 
-logger = logging.getLogger("auth")
+logger = logging.getLogger("chat")
 
 
 class ChatService:
@@ -114,9 +114,19 @@ class ChatService:
 		return new_group_chat
 
 	async def update_chat(self, chatId: UUID, chatUpdate: ChatUpdate, user: User) -> ChatResponse:
-		chat = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
+		chat = await self.chat_repo.get(id=chatId)
 
 		if not chat:
+			logger.warning(
+				"Chat not found",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatNotFoundException("Chat not found")
+
+		chatOfUser = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
+
+		if not chatOfUser:
 			logger.warning(
 				"User not owner of this chat",
 				extra={
@@ -160,6 +170,16 @@ class ChatService:
 		return update_chat
 
 	async def delete_chat(self, chatId: UUID, user: User) -> dict[str, str]:
+		chat = await self.chat_repo.get(id=chatId)
+
+		if not chat:
+			logger.warning(
+				"Chat not found",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatNotFoundException("Chat not found")
+			
 		chat = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
 
 		if not chat:
