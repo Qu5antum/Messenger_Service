@@ -14,3 +14,9 @@ class ChatNotBelongToUserException(BaseAppException):
 class ChatIsNotGroupException(BaseAppException):
 	def __init__(self, message, status_code = 400):
 	    super().__init__(message, status_code)
+
+
+class OwnerCantLeaveChatException(BaseAppException):
+	def __init__(self, message, status_code = 400):
+			super().__init__(message, status_code)
+

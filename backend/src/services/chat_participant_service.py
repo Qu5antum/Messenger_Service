@@ -7,7 +7,7 @@ from src.database.models import User
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.repositories.user_repository import UserRepository
-from src.exception_handlers.chat_exception import ChatNotFoundException, ChatNotBelongToUserException, ChatIsNotGroupException
+from src.exception_handlers.chat_exception import ChatNotFoundException, ChatNotBelongToUserException, ChatIsNotGroupException, OwnerCantLeaveChatException
 from src.exception_handlers.user_exceptions import UserNotFoundException, UserAlreadyParticipantInChatException, UserNotParticipantInChatException
 from src.exception_handlers.db_exception import DatabaseException
 from src.api.schemas.chat_schema import ChatParticipantResponse
@@ -199,6 +199,79 @@ class ChatParticipantService:
 		)
 
 		return participants
+
+	async def leave_chat(self, chatId: UUID, current_user: User): 
+		chat = await self.chat_repo.get(id=chatId)
+		
+		if not chat:
+			logger.warning(
+				"Chat not found",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatNotFoundException("Chat not found")
+
+		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=current_user.id)
+		
+		if not chat_participant:
+			logger.warning(
+				"User not participant in this chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
+			
+			raise UserNotParticipantInChatException("User not participant in this chat")
+
+		if chat.owner_id == current_user.id:
+			chat_participants = await self.chat_participant_repo.get_participants(chatId=chatId)
+
+			if len(chat_participants) > 1:
+				logger.warning(
+					"Owner can't leave chat if chat has participants",
+					extra={
+						"user_id": str(current_user.id),
+						"chat_id": str(chatId)
+					}
+				)
+
+				raise OwnerCantLeaveChatException("Owner can't leave chat, if chat has participants, make owner another user or remove every user from chat")
+			else:
+				await self.chat_participant_repo.delete(id=chat_participant.id)
+
+				logger.info(
+					"Owner deleted from chat",
+					extra={
+						"user_id": str(current_user.id),
+						"chat_id": str(chatId)
+					}
+				)
+
+				await self.chat_repo.delete(id=chat.id)
+
+				logger.info(
+					"Chat group is empty, chat deleted",
+					extra={
+						"user_id": str(current_user.id),
+						"chat_id": str(chatId)
+					}
+				)
+
+				return {"detail": "User successfully leaved from chat"}
+
+		await self.chat_participant_repo.delete(id=chat_participant.id)
+
+		logger.info(
+			"Successfully removed from chat",
+			extra={
+				"user_id": str(current_user.id),
+				"chat_id": str(chatId)
+			}
+		)
+
+		return {"detail": "User successfully leaved from chat"}
+
 
 
 
