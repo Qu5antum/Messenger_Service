@@ -3,7 +3,7 @@ from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import datetime
-from enum import Enum
+from enum import Enum, unique
 from typing import Optional
 
 
@@ -78,7 +78,7 @@ class ChatParticipant(Base):
     chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
     chat: Mapped['Chat'] = relationship(back_populates="chat_participants")
 
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     user: Mapped['User'] = relationship(back_populates="participation_in_chats")
 
     joined_at: Mapped[datetime.datetime] = mapped_column(

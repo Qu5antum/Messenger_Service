@@ -1,3 +1,5 @@
+import datetime
+
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from uuid import UUID
@@ -24,3 +26,12 @@ class ChatUpdate(BaseModel):
 	avatar: Optional[str] = None
 	description: Optional[str] = None
 	owner_id: Optional[UUID] = None
+
+
+class ChatParticipantResponse(BaseModel):
+	id: UUID
+	chat_id: UUID
+	user_id: UUID
+	joined_at: datetime.datetime
+
+	model_config = ConfigDict(from_attributes=True)

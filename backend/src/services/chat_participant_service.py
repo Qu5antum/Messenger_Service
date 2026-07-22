@@ -10,6 +10,7 @@ from src.repositories.user_repository import UserRepository
 from src.exception_handlers.chat_exception import ChatNotFoundException, ChatNotBelongToUserException, ChatIsNotGroupException
 from src.exception_handlers.user_exceptions import UserNotFoundException, UserAlreadyParticipantInChatException, UserNotParticipantInChatException
 from src.exception_handlers.db_exception import DatabaseException
+from src.api.schemas.chat_schema import ChatParticipantResponse
 
 logger = logging.getLogger("chat_participant")
 
@@ -170,6 +171,37 @@ class ChatParticipantService:
 		)
 
 		return {"detail": "User removed from the chat"}
+
+	async def get_participants_on_group_chat(self, chatId: UUID) -> list[ChatParticipantResponse]:
+		chat = await self.chat_repo.get(id=chatId)
+
+		if not chat:
+			logger.warning(
+				"Chat not found",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatNotFoundException("Chat not found")
+
+		if not chat.is_group:
+			logger.warning(
+				"Chat is private, can't get participants",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatIsNotGroupException("Chat is not group chat")
+
+		participants = await self.chat_participant_repo.get_participants(chatId=chatId)
+
+		logger.info(
+			"Successful response of participants in chat",
+			extra={"chat_id": str(chatId)}
+		)
+
+		return participants
+
+
+
 
 
 
