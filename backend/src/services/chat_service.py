@@ -83,7 +83,7 @@ class ChatService:
 
 		return new_private_chat
 
-	async def create_group_chat(chat: ChatCreate, user: User) -> ChatResponse:
+	async def create_group_chat(self, chat: ChatCreate, user: User) -> ChatResponse:
 		try:
 			new_group_chat = await self.chat_repo.create(
 				is_group=True,
@@ -114,17 +114,9 @@ class ChatService:
 		return new_group_chat
 
 	async def update_chat(self, chatId: UUID, chatUpdate: ChatUpdate, user: User) -> ChatResponse:
-		chat = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id)
+		chat = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
 
 		if not chat:
-			logger.warning(
-				"Chat not found",
-				extra={"chat_id": str(chatId)}
-			)
-
-			raise ChatNotFoundException("Chat not found")
-
-		if chatId != chat.id:
 			logger.warning(
 				"User not owner of this chat",
 				extra={
@@ -166,6 +158,26 @@ class ChatService:
 		)
 
 		return update_chat
+
+	async def delete_chat(self, chatId: UUID, user: User) -> dict[str, str]:
+		chat = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
+
+		if not chat:
+			logger.warning(
+				"User not owner of this chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(user.id)
+				}
+			)
+
+			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
+
+		await self.chat_repo.delete(id=chatId)
+
+		return {"detail": "Chat successfully deleted"}
+
+
 
 
 

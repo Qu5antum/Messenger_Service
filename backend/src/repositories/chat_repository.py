@@ -9,9 +9,13 @@ from src.database.models import Chat
 class ChatRepository(BaseRepository):
 	model = Chat
 
-	async def get_chat_by_owner_id(self, owner_id: UUID):
+	async def get_chat_by_owner_id(self, owner_id: UUID, chat_id: UUID):
 		result = await self.session.execute(
-			select(self.model).where(self.model.owner_id == owner_id)
+			select(self.model)
+			.where(
+				self.model.owner_id == owner_id,
+				self.model.id == chat_id
+			)
 		)
 
 		return result.scalar_one_or_none()
