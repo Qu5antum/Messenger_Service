@@ -35,18 +35,7 @@ class ChatParticipantService:
 
 			raise ChatIsNotGroupException("Chat is not group, you can't add participant")
 
-		is_owner = await self.chat_repo.get_chat_by_owner_id(owner_id=current_user.id, chat_id=chatId)
-		
-		if not is_owner:
-			logger.warning(
-				"User not owner of this chat",
-				extra={
-					"chat_id": str(chatId),
-					"user_id": str(current_user.id)
-				}
-			)
-
-			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
+		await self.helper.get_owner_or_403(ownerId=current_user.id, chatId=chatId)
 		
 		user = await self.user_repo.get(id=userId)
 
@@ -132,31 +121,9 @@ class ChatParticipantService:
 
 			raise UserNotFoundException("User not found")
 
-		is_participant = await self.chat_participant_repo.is_participant(userId=userId, chatId=chatId)
+		is_participant = await self.helper.get_participant_or_400(userId=userId, chatId=chatId)
 
-		if not is_participant:
-			logger.warning(
-				"User not participant in this chat",
-				extra={
-					"chat_id": str(chatId),
-					"user_id": str(current_user.id)
-				}
-			)
-			
-			raise UserNotParticipantInChatException("User not participant in this chat")
-
-		is_owner = await self.chat_repo.get_chat_by_owner_id(owner_id=current_user.id, chat_id=chatId)
-
-		if not is_owner:
-			logger.warning(
-				"User not owner of this chat",
-				extra={
-					"chat_id": str(chatId),
-					"user_id": str(current_user.id)
-				}
-			)
-
-			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
+		await self.helper.get_owner_or_403(ownerId=current_user.id, chatId=chatId)
 
 		await self.chat_participant_repo.delete(id=is_participant.id)
 
@@ -182,18 +149,7 @@ class ChatParticipantService:
 
 			raise ChatIsNotGroupException("Chat is not group chat")
 
-		is_participant = await self.chat_participant_repo.is_participant(userId=user.id, chatId=chatId)
-
-		if not is_participant:
-			logger.warning(
-				"User not participant in chat",
-				extra={
-					"user_id": str(user.id),
-					"chat_id": str(chatId)
-				}
-			)
-
-			raise UserNotParticipantInChatException("User not participant in chat")
+		await self.helper.get_participant_or_400(userId=user.id, chatId=chatId)
 
 		participants = await self.chat_participant_repo.get_participants(chatId=chatId)
 
@@ -207,18 +163,7 @@ class ChatParticipantService:
 	async def leave_chat(self, chatId: UUID, current_user: User) -> dict[str, str]: 
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
-		is_participant = await self.chat_participant_repo.is_participant(userId=current_user.id, chatId=chatId)
-		
-		if not is_participant:
-			logger.warning(
-				"User not participant in this chat",
-				extra={
-					"chat_id": str(chatId),
-					"user_id": str(current_user.id)
-				}
-			)
-			
-			raise UserNotParticipantInChatException("User not participant in this chat")
+		is_participant = await self.helper.get_participant_or_400(userId=current_user.id, chatId=chatId)
 
 		if chat.owner_id == current_user.id:
 			chat_participants = await self.chat_participant_repo.get_participants(chatId=chatId)

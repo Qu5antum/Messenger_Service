@@ -9,7 +9,7 @@ from src.repositories.chat_repository import ChatRepository
 from src.repositories.user_repository import UserRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.exception_handlers.user_exceptions import UserNotFoundException, UserNotParticipantInChatException
-from src.exception_handlers.chat_exception import ChatNotBelongToUserException, ChatIsNotGroupException, InvalidChatCreationException
+from src.exception_handlers.chat_exception import ChatIsNotGroupException, InvalidChatCreationException
 from src.exception_handlers.db_exception import DatabaseException
 from .helper import Helper
 
@@ -53,7 +53,7 @@ class ChatService:
 
 			logger.info("Chat already exists of this users")
 
-			return chat
+			return ChatResponse.model_validate(chat)
 		try:
 			new_private_chat = await self.chat_repo.create()
 
@@ -144,18 +144,7 @@ class ChatService:
 
 			raise ChatIsNotGroupException("This chat is not group you can't edit it")
 
-		is_owner = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
-
-		if not is_owner:
-			logger.warning(
-				"User not owner of this chat",
-				extra={
-					"chat_id": str(chatId),
-					"user_id": str(user.id)
-				}
-			)
-
-			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
+		await self.helper.get_owner_or_403(ownerId=user.id, chatId=chatId)
 
 		try:
 			data = chatUpdate.model_dump(exclude_unset=True)
@@ -200,18 +189,7 @@ class ChatService:
 
 			raise ChatIsNotGroupException("Chat is private you can't delete it ")
 
-		is_owner = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
-
-		if not is_owner:
-			logger.warning(
-				"User not owner of this chat",
-				extra={
-					"chat_id": str(chatId),
-					"user_id": str(user.id)
-				}
-			)
-
-			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
+		await self.helper.get_owner_or_403(ownerId=user.id, chatId=chatId)
 
 		await self.chat_repo.delete(id=chatId)
 
@@ -226,28 +204,14 @@ class ChatService:
 		# implement redis service
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
-		is_participant = await self.chat_participant_repo.is_participant(
-			userId=user.id,
-			chatId=chatId
-		)
-
-		if not is_participant:
-			logger.warning(
-				"User not participant in chat",
-				extra={
-					"chat_id": str(chatId),
-					"user_id": str(user.id)
-				}
-			)
-
-			raise UserNotParticipantInChatException("User not participant in chat")
+		await self.helper.get_participant_or_400(userId=user.id, chatId=chatId)
 
 		logger.info(
 			"Successful response response",
 			extra={"chat_id": str(chatId)}
 		)
 
-		return chat
+		return ChatResponse.model_validate(chat)
 
 	async def get_user_chats(self, user: User) -> list[ChatResponse]:
 		# implement redis service
