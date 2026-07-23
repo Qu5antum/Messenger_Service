@@ -28,12 +28,12 @@ class MessageService:
         # implemet redis service
         await self.helper.get_chat_or_404(chatId=chatId)
 
-        chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(
+        is_participant = await self.chat_participant_repo.is_participant(
             userId=sender.id, 
             chatId=chatId
         )
 
-        if not chat_participant:
+        if not is_participant:
             logger.warning(
                 "User not participant in chat",
                 extra={

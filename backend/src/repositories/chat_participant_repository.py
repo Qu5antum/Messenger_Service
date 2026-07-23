@@ -19,7 +19,7 @@ class ChatParticipantRepository(BaseRepository):
 
 		return result.scalar_one_or_none()
 
-	async def get_chat_participant_by_user_id(self, userId: UUID, chatId: UUID):
+	async def is_participant(self, userId: UUID, chatId: UUID):
 		result = await self.session.execute(
 			select(self.model)
 			.where(

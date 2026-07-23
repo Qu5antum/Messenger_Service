@@ -144,9 +144,9 @@ class ChatService:
 
 			raise ChatIsNotGroupException("This chat is not group you can't edit it")
 
-		chatOfUser = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
+		is_owner = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
 
-		if not chatOfUser:
+		if not is_owner:
 			logger.warning(
 				"User not owner of this chat",
 				extra={
@@ -200,9 +200,9 @@ class ChatService:
 
 			raise ChatIsNotGroupException("Chat is private you can't delete it ")
 
-		chat_owner = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
+		is_owner = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
 
-		if not chat_owner:
+		if not is_owner:
 			logger.warning(
 				"User not owner of this chat",
 				extra={
@@ -226,12 +226,12 @@ class ChatService:
 		# implement redis service
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
-		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(
+		is_participant = await self.chat_participant_repo.is_participant(
 			userId=user.id,
 			chatId=chatId
 		)
 
-		if not chat_participant:
+		if not is_participant:
 			logger.warning(
 				"User not participant in chat",
 				extra={
