@@ -93,6 +93,16 @@ class ChatService:
 				owner_id=user.id
 			)
 
+			await self.chat_participant_repo.create(
+				chat_id=new_group_chat,
+				user_id=user.id
+			)
+
+			logger.info(
+				"New participant added to chat",
+				extra={"user_id": str(user.id)}
+			)
+
 			await self.session.commit()
 
 		except IntegrityError:

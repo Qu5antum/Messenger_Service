@@ -173,6 +173,7 @@ class ChatParticipantService:
 		return {"detail": "User removed from the chat"}
 
 	async def get_participants_on_group_chat(self, chatId: UUID) -> list[ChatParticipantResponse]:
+		# implement redis service
 		chat = await self.chat_repo.get(id=chatId)
 
 		if not chat:
