@@ -135,7 +135,6 @@ class MessageService:
         return {"detail": "Message deleted"}
 
     async def get_messages_in_chat(self, chatId: UUID, user: User) -> list[MessageResponse]:
-        # implement redis service
         await self.helper.get_chat_or_404(chatId=chatId)
 
         await self.helper.get_participant_or_400(userId=user.id, chatId=chatId)
@@ -150,24 +149,30 @@ class MessageService:
         return messages
 
     async def get_message(self, messageId: UUID, user: User) -> MessageResponse:
-        # implement redis service
         message = await self.helper.get_message_or_404(messageId=messageId)
 
-        if message.sender_id != user.id:
-            logger.warning(
-                "Message does not belong to the user",
-                extra={
-                    "message_id": str(messageId),
-                    "user_id": str(user.id)
-                }
-            )
+        await self.helper.get_participant_or_400(
+            userId=user.id,
+            chatId=message.chat_id
+        )
 
-            raise MessageNotBelongToUserException("Message does not belong to the user")
+        logger.info(
+            "Successfull response of message",
+            extra={
+                "message_id": str(messageId),
+                "user_id": str(messageId)
+            }
+        )
 
         return message
 
-    async def search_messages(self, messageText: str, chatId: UUID) -> list[MessageResponse]:
+    async def search_messages(self, messageText: str, chatId: UUID, user: User) -> list[MessageResponse]:
         await self.helper.get_chat_or_404(chatId=chatId)
+
+        await self.helper.get_participant_or_400(
+            userId=user.id,
+            chatId=chatId
+        )
 
         messages = await self.message_repo.search_message(message_text=messageText, chatId=chatId)
 
