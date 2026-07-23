@@ -85,6 +85,7 @@ class MessageService:
         raise new_message
 
     async def edit_message(self, messageId: UUID, sender: User, message: MessageUpdate) -> MessageResponse:
+        # implement redis service
         message = await self.message_repo.get(id=messageId)
 
         if not message:
@@ -138,3 +139,36 @@ class MessageService:
 
         return updated_message
 
+    async def delete_message(self, messageId: UUID, user: User) -> dict[str, str]:
+        message = await self.message_repo.get(id=messageId)
+
+        if not message:
+            logger.warning(
+                "Message not found",
+                extra={"message_id": str(messageId)}
+            )
+
+            raise MessageNotFoundException("Message not found")
+
+        if message.sender_id != user.id:
+            logger.warning(
+                "Message not belong to user",
+                extra={
+                    "message_id": str(messageId),
+                    "user_id": str(user.id)
+                }
+            )
+
+            raise MessageNotBelongToUserException("Message not belong to user")
+
+        await self.message_repo.delete(id=messageId)
+
+        logger.info(
+            "Message successfully deleted",
+            extra={
+                "message_id": str(messageId),
+                "user_id": str(user.id)
+            }
+        )
+
+        return {"detail": "Message deleted"}
