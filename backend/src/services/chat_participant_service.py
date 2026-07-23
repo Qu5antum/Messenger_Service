@@ -7,7 +7,7 @@ from src.database.models import User
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.repositories.user_repository import UserRepository
-from src.exception_handlers.chat_exception import ChatNotFoundException, ChatNotBelongToUserException, ChatIsNotGroupException, OwnerCantLeaveChatException
+from src.exception_handlers.chat_exception import ChatNotBelongToUserException, ChatIsNotGroupException, OwnerCantLeaveChatException, InvalidChatCreationException
 from src.exception_handlers.user_exceptions import UserNotFoundException, UserAlreadyParticipantInChatException, UserNotParticipantInChatException
 from src.exception_handlers.db_exception import DatabaseException
 from src.api.schemas.chat_schema import ChatParticipantResponse
@@ -25,6 +25,29 @@ class ChatParticipantService:
 		self.helper = Helper(session=self.session)
 
 	async def add_participant_to_group_chat(self, chatId: UUID, userId: UUID, current_user: User) -> dict[str, str]:
+		chat = await self.helper.get_chat_or_404(chatId=chatId)
+		
+		if not chat.is_group:
+			logger.warning(
+				"Chat is private, not group chat",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatIsNotGroupException("Chat is not group, you can't add participant")
+
+		chatOfUser = await self.chat_repo.get_chat_by_owner_id(owner_id=current_user.id, chat_id=chatId)
+		
+		if not chatOfUser:
+			logger.warning(
+				"User not owner of this chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
+
+			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
+		
 		user = await self.user_repo.get(id=userId)
 
 		if not user:
@@ -34,6 +57,17 @@ class ChatParticipantService:
 			)
 
 			raise UserNotFoundException("User not found")
+
+		if userId == current_user.id:
+			logger.warning(
+				"User can't add yourself to chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
+
+			raise InvalidChatCreationException("User can't add yourself to chat")
 
 		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=userId, chatId=chatId)
 
@@ -48,30 +82,6 @@ class ChatParticipantService:
 			
 			raise UserAlreadyParticipantInChatException("User already in the chat")
 
-
-		chat = await self.helper.get_chat_or_404(chatId=chatId)
-
-		if not chat.is_group:
-			logger.warning(
-				"Chat is private, not group chat",
-				extra={"chat_id": str(chatId)}
-			)
-
-			raise ChatIsNotGroupException("Chat is not group, you can't add participant")
-
-		chatOfUser = await self.chat_repo.get_chat_by_owner_id(owner_id=current_user.id, chat_id=chatId)
-
-		if not chatOfUser:
-			logger.warning(
-				"User not owner of this chat",
-				extra={
-					"chat_id": str(chatId),
-					"user_id": str(current_user.id)
-				}
-			)
-
-			raise ChatNotBelongToUserException("Permision denied, this group chat not belong to user")
-
 		try:
 			await self.chat_participant_repo.create(
 				chat_id=chatId,
@@ -81,6 +91,8 @@ class ChatParticipantService:
 			await self.session.commit()
 
 		except IntegrityError:
+			await self.session.rollback()
+
 			logger.error(
 				"Database error, new participant not created",
 				exc_info=True,
@@ -99,7 +111,7 @@ class ChatParticipantService:
 
 		return {"detail": "New participant added to the chat"}
 
-	async def remove_paritcipant_from_chat(self, chatId: UUID, userId: UUID, current_user: User) -> dict[str, str]:
+	async def remove_participant_from_chat(self, chatId: UUID, userId: UUID, current_user: User) -> dict[str, str]:
 		user = await self.user_repo.get(id=userId)
 
 		if not user:
@@ -158,7 +170,7 @@ class ChatParticipantService:
 
 		return {"detail": "User removed from the chat"}
 
-	async def get_participants_on_group_chat(self, chatId: UUID) -> list[ChatParticipantResponse]:
+	async def get_participants_on_group_chat(self, chatId: UUID, user: User) -> list[ChatParticipantResponse]:
 		# implement redis service
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
@@ -169,6 +181,19 @@ class ChatParticipantService:
 			)
 
 			raise ChatIsNotGroupException("Chat is not group chat")
+
+		user_is_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=user.id, chatId=chatId)
+
+		if not user_is_participant:
+			logger.warning(
+				"User not participant in chat",
+				extra={
+					"user_id": str(user.id),
+					"chat_id": str(chatId)
+				}
+			)
+
+			raise UserNotParticipantInChatException("User not participant in chat")
 
 		participants = await self.chat_participant_repo.get_participants(chatId=chatId)
 
@@ -198,19 +223,9 @@ class ChatParticipantService:
 		if chat.owner_id == current_user.id:
 			chat_participants = await self.chat_participant_repo.get_participants(chatId=chatId)
 
-			if len(chat_participants) > 1:
-				logger.warning(
-					"Owner can't leave chat if chat has participants",
-					extra={
-						"user_id": str(current_user.id),
-						"chat_id": str(chatId)
-					}
-				)
-
-				raise OwnerCantLeaveChatException("Owner can't leave chat, if chat has participants, make owner another user or remove every user from chat")
-			else:
+			if len(chat_participants) == 1:
 				await self.chat_participant_repo.delete(id=chat_participant.id)
-
+				
 				logger.info(
 					"Owner deleted from chat",
 					extra={
@@ -230,6 +245,16 @@ class ChatParticipantService:
 				)
 
 				return {"detail": "User successfully leaved from chat"}
+
+			logger.warning(
+				"Owner can't leave chat if chat has participants",
+				extra={
+					"user_id": str(current_user.id),
+					"chat_id": str(chatId)
+				}
+			)
+
+			raise OwnerCantLeaveChatException("Owner can't leave chat, if chat has participants, make owner another user or remove every user from chat")
 
 		await self.chat_participant_repo.delete(id=chat_participant.id)
 
