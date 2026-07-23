@@ -133,3 +133,36 @@ class MessageService:
         )
 
         return {"detail": "Message deleted"}
+
+    async def get_messages_in_chat(self, chatId: UUID, user: User) -> list[MessageResponse]:
+        # implement redis service
+        await self.helper.get_chat_or_404(chatId=chatId)
+
+        await self.helper.get_participant_or_400(userId=user.id, chatId=chatId)
+
+        messages = await self.message_repo.get_all_messages_by_chat_id(chatId=chatId)
+
+        logger.info(
+            "Successfull response messages",
+            extra={"chat_id": str(chatId)}
+        )
+
+        return messages
+
+    async def get_message(self, messageId: UUID, user: User) -> MessageResponse:
+        # implement redis service
+        message = await self.helper.get_message_or_404(messageId=messageId)
+
+        if message.sender_id != user.id:
+            logger.warning(
+                "Message does not belong to the user",
+                extra={
+                    "message_id": str(messageId),
+                    "user_id": str(user.id)
+                }
+            )
+
+            raise MessageNotBelongToUserException("Message does not belong to the user")
+
+        return message
+
