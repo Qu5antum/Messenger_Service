@@ -166,3 +166,15 @@ class MessageService:
 
         return message
 
+    async def search_messages(self, messageText: str, chatId: UUID) -> list[MessageResponse]:
+        await self.helper.get_chat_or_404(chatId=chatId)
+
+        messages = await self.message_repo.search_message(message_text=messageText, chatId=chatId)
+
+        logger.info(
+            "Messages response",
+            extra={"chat_id": str(chatId)}
+        )
+
+        return messages
+

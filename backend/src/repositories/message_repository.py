@@ -16,10 +16,13 @@ class MessageRepository(BaseRepository):
 
         return result.scalars().all()
 
-    async def search_message(self, message_text: str):
+    async def search_message(self, message_text: str, chatId: UUID):
         result = await self.session.execute(
             select(self.model)
-            .where(self.model.text.ilike(f"%{message_text}%"))
+            .where(
+                self.model.chat_id == chatId,
+                self.model.text.ilike(f"%{message_text}%")
+            )
         )
 
         return result.scalars().all()
