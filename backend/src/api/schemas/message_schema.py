@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from uuid import UUID
+from typing import Optional
 
 
 class MessageRequest(BaseModel):
@@ -13,3 +14,7 @@ class MessageResponse(BaseModel):
 	text: str
 
 	model_config = ConfigDict(from_attributes=True)
+
+
+class MessageUpdate(BaseModel):
+	text: Optional[str] = None

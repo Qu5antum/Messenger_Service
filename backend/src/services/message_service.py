@@ -5,12 +5,13 @@ from sqlalchemy.exc import IntegrityError
 from src.database.db import AsyncSession
 from src.database.models import User
 from src.repositories.message_repository import MessageRepository
-from src.api.schemas.message_schema import MessageRequest, MessageResponse
+from src.api.schemas.message_schema import MessageRequest, MessageResponse, MessageUpdate
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.exception_handlers.chat_exception import ChatNotFoundException
 from src.exception_handlers.user_exceptions import UserNotParticipantInChatException
 from src.exception_handlers.db_exception import DatabaseException
+from src.exception_handlers.message_exception import MessageNotFoundException, MessageNotBelongToUserException
 
 logger = logging.getLogger("message")
 
@@ -23,6 +24,7 @@ class MessageService:
         self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 
     async def send_message(self, chatId: UUID, sender: User, message: MessageRequest) -> MessageResponse:
+        # implemet redis service
         chat = await self.chat_repo.get(id=chatId)
         
         if not chat:
@@ -82,6 +84,57 @@ class MessageService:
 
         raise new_message
 
+    async def edit_message(self, messageId: UUID, sender: User, message: MessageUpdate) -> MessageResponse:
+        message = await self.message_repo.get(id=messageId)
 
+        if not message:
+            logger.warning(
+                "Message not found",
+                extra={"message_id": str(messageId)}
+            )
 
+            raise MessageNotFoundException("Message not found")
+
+        if message.sender_id != sender.id:
+            logger.warning(
+                "Message not belong to user",
+                extra={
+                    "message_id": str(messageId),
+                    "user_id": str(sender.id)
+                }
+            )
+
+            raise MessageNotBelongToUserException("Message not belong to user")
+
+        try:
+            data = message.model_dump(exclude_unset=True)
+
+            updated_message = await self.message_repo.update(
+                id=messageId,
+                data=data
+            )
+
+        except IntegrityError:
+            await self.session.rollback()
+
+            logger.error(
+                "Message not updated, Database error",
+                exc_info=True,
+                extra={
+                    "message_id": str(messageId),
+                    "user_id": str(sender.id)
+                }
+            )
+
+            raise DatabaseException("Message not updated")
+
+        logger.info(
+            "Message updated",
+            extra={
+                "message_id": str(messageId),
+                "user_id": str(sender.id)
+            }
+        )
+
+        return updated_message
 
