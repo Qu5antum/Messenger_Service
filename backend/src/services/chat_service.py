@@ -8,8 +8,8 @@ from src.api.schemas.chat_schema import ChatCreate, ChatResponse, ChatUpdate
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.user_repository import UserRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
-from src.exception_handlers.user_exceptions import UserNotFoundException
-from src.exception_handlers.chat_exception import ChatNotBelongToUserException, ChatNotFoundException
+from src.exception_handlers.user_exceptions import UserNotFoundException, UserNotParticipantInChatException
+from src.exception_handlers.chat_exception import ChatNotBelongToUserException, ChatNotFoundException, ChatIsNotGroupException, InvalidChatCreationException
 from src.exception_handlers.db_exception import DatabaseException
 
 logger = logging.getLogger("chat")
@@ -33,7 +33,15 @@ class ChatService:
 
 			raise UserNotFoundException("User not found")
 
-		chat_participant = self.chat_participant_repo.get_private_chat_of_two_user(
+		if user.id == current_user.id:
+			logger.warning(
+				"User can't create private chat for yourself",
+				extra={"user_id": str(current_user.id)}
+			)
+
+			raise InvalidChatCreationException("User can't create private chat for yourself")
+
+		chat_participant = await self.chat_participant_repo.get_private_chat_of_two_user(
 			userId1=user.id,
 			userId2=current_user.id
 		)
@@ -47,13 +55,13 @@ class ChatService:
 		try:
 			new_private_chat = await self.chat_repo.create()
 
-			new_chat_participants = await self.chat_participant_repo.create(
-				chat_id=chat_participant.chat_id,
+			await self.chat_participant_repo.create(
+				chat_id=new_private_chat.chat_id,
 				user_id=current_user.id
 			)
 
-			new_chat_participants = await self.chat_participant_repo.create(
-				chat_id=chat_participant.chat_id,
+			await self.chat_participant_repo.create(
+				chat_id=new_private_chat.chat_id,
 				user_id=user.id
 			)
 
@@ -88,13 +96,13 @@ class ChatService:
 			new_group_chat = await self.chat_repo.create(
 				is_group=True,
 				title= chat.title,
-				avatar=chat.title,
+				avatar=chat.avatar,
 				description=chat.description,
 				owner_id=user.id
 			)
 
 			await self.chat_participant_repo.create(
-				chat_id=new_group_chat,
+				chat_id=new_group_chat.id,
 				user_id=user.id
 			)
 
@@ -133,6 +141,14 @@ class ChatService:
 			)
 
 			raise ChatNotFoundException("Chat not found")
+
+		if not chat.is_group:
+			logger.warning(
+				"This chat is not group you can't edit it",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatIsNotGroupException("This chat is not group you can't edit it")
 
 		chatOfUser = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
 
@@ -190,9 +206,17 @@ class ChatService:
 
 			raise ChatNotFoundException("Chat not found")
 
-		chat = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
+		if not chat.is_group:
+			logger.warning(
+				"Chat is private you can't delete it",
+				extra={"chat_id": str(chatId)}
+			)
 
-		if not chat:
+			raise ChatIsNotGroupException("Chat is private you can't delete it ")
+
+		chat_owner = await self.chat_repo.get_chat_by_owner_id(owner_id=user.id, chat_id=chatId)
+
+		if not chat_owner:
 			logger.warning(
 				"User not owner of this chat",
 				extra={
@@ -212,9 +236,33 @@ class ChatService:
 
 		return {"detail": "Chat successfully deleted"}
 
-	async def get_chat_by_id(self, chatId: UUID) -> ChatResponse: 
+	async def get_chat_by_id(self, chatId: UUID, user: User) -> ChatResponse: 
 		# implement redis service
 		chat = await self.chat_repo.get(id=chatId)
+
+		if not chat: 
+			logger.warning(
+				"Chat not found",
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise ChatNotFoundException("Chat not found")
+
+		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(
+			userId=user.id,
+			chatId=chatId
+		)
+
+		if not chat_participant:
+			logger.warning(
+				"User not participant in chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(user.id)
+				}
+			)
+
+			raise UserNotParticipantInChatException("User not participant in chat")
 
 		logger.info(
 			"Successful response response",
@@ -227,7 +275,10 @@ class ChatService:
 		# implement redis service
 		chat_participants = await self.chat_participant_repo.get_user_participant_in_chats(userId=user.id)
 
-		chat_ids = [chat_id for chat_id in chat_participants.chat_id]
+		chat_ids = [
+			participant.chat_id
+			for participant in chat_participants
+		]
 
 		chats = await self.chat_repo.get_chats_by_ids(chatIds=chat_ids)
 
