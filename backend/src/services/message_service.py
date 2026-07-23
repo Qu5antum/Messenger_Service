@@ -8,10 +8,10 @@ from src.repositories.message_repository import MessageRepository
 from src.api.schemas.message_schema import MessageRequest, MessageResponse, MessageUpdate
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
-from src.exception_handlers.chat_exception import ChatNotFoundException
 from src.exception_handlers.user_exceptions import UserNotParticipantInChatException
 from src.exception_handlers.db_exception import DatabaseException
 from src.exception_handlers.message_exception import MessageNotFoundException, MessageNotBelongToUserException
+from .helper import Helper
 
 logger = logging.getLogger("message")
 
@@ -22,18 +22,11 @@ class MessageService:
         self.message_repo = MessageRepository(session=self.session)
         self.chat_repo = ChatRepository(session=self.session)
         self.chat_participant_repo = ChatParticipantRepository(session=self.session)
+        self.helper = Helper(session=self.session)
 
     async def send_message(self, chatId: UUID, sender: User, message: MessageRequest) -> MessageResponse:
         # implemet redis service
-        chat = await self.chat_repo.get(id=chatId)
-        
-        if not chat:
-            logger.warning(
-                "Chat not found",
-                extra={"chat_id": str(chatId)}
-            )
-
-            raise ChatNotFoundException("Chat not found")
+        await self.helper.get_chat_or_404(chatId=chatId)
 
         chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(
             userId=sender.id, 

@@ -11,6 +11,7 @@ from src.exception_handlers.chat_exception import ChatNotFoundException, ChatNot
 from src.exception_handlers.user_exceptions import UserNotFoundException, UserAlreadyParticipantInChatException, UserNotParticipantInChatException
 from src.exception_handlers.db_exception import DatabaseException
 from src.api.schemas.chat_schema import ChatParticipantResponse
+from .helper import Helper
 
 logger = logging.getLogger("chat_participant")
 
@@ -21,6 +22,7 @@ class ChatParticipantService:
 		self.chat_repo = ChatRepository(session=self.session)
 		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 		self.user_repo = UserRepository(session=self.session)
+		self.helper = Helper(session=self.session)
 
 	async def add_participant_to_group_chat(self, chatId: UUID, userId: UUID, current_user: User) -> dict[str, str]:
 		user = await self.user_repo.get(id=userId)
@@ -47,15 +49,7 @@ class ChatParticipantService:
 			raise UserAlreadyParticipantInChatException("User already in the chat")
 
 
-		chat = await self.chat_repo.get(id=chatId)
-
-		if not chat:
-			logger.warning(
-				"Chat not found",
-				extra={"chat_id": str(chatId)}
-			)
-
-			raise ChatNotFoundException("Chat not found")
+		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
 		if not chat.is_group:
 			logger.warning(
@@ -129,15 +123,7 @@ class ChatParticipantService:
 			
 			raise UserNotParticipantInChatException("User not participant in this chat")
 
-		chat = await self.chat_repo.get(id=chatId)
-
-		if not chat:
-			logger.warning(
-				"Chat not found",
-				extra={"chat_id": str(chatId)}
-			)
-
-			raise ChatNotFoundException("Chat not found")
+		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
 		if not chat.is_group:
 			logger.warning(
@@ -174,15 +160,7 @@ class ChatParticipantService:
 
 	async def get_participants_on_group_chat(self, chatId: UUID) -> list[ChatParticipantResponse]:
 		# implement redis service
-		chat = await self.chat_repo.get(id=chatId)
-
-		if not chat:
-			logger.warning(
-				"Chat not found",
-				extra={"chat_id": str(chatId)}
-			)
-
-			raise ChatNotFoundException("Chat not found")
+		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
 		if not chat.is_group:
 			logger.warning(
@@ -202,15 +180,7 @@ class ChatParticipantService:
 		return participants
 
 	async def leave_chat(self, chatId: UUID, current_user: User) -> dict[str, str]: 
-		chat = await self.chat_repo.get(id=chatId)
-		
-		if not chat:
-			logger.warning(
-				"Chat not found",
-				extra={"chat_id": str(chatId)}
-			)
-
-			raise ChatNotFoundException("Chat not found")
+		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
 		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(userId=current_user.id, chatId=chatId)
 		

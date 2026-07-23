@@ -9,8 +9,9 @@ from src.repositories.chat_repository import ChatRepository
 from src.repositories.user_repository import UserRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.exception_handlers.user_exceptions import UserNotFoundException, UserNotParticipantInChatException
-from src.exception_handlers.chat_exception import ChatNotBelongToUserException, ChatNotFoundException, ChatIsNotGroupException, InvalidChatCreationException
+from src.exception_handlers.chat_exception import ChatNotBelongToUserException, ChatIsNotGroupException, InvalidChatCreationException
 from src.exception_handlers.db_exception import DatabaseException
+from .helper import Helper
 
 logger = logging.getLogger("chat")
 
@@ -21,6 +22,7 @@ class ChatService:
 		self.chat_repo = ChatRepository(session=self.session)
 		self.user_repo = UserRepository(session=self.session)
 		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
+		self.helper = Helper(session=self.session)
 
 	async def create_private_chat(self, phone_number: str, current_user: User) -> ChatResponse:
 		user = await self.user_repo.get_user_id_by_phone_number(phone_number=phone_number)
@@ -49,7 +51,7 @@ class ChatService:
 		if chat_participant:
 			chat = await self.chat_repo.get(chat_participant.chat_id)
 
-			logger.info("Chat already exits of this users")
+			logger.info("Chat already exists of this users")
 
 			return chat
 		try:
@@ -132,15 +134,7 @@ class ChatService:
 		return new_group_chat
 
 	async def update_chat(self, chatId: UUID, chatUpdate: ChatUpdate, user: User) -> ChatResponse:
-		chat = await self.chat_repo.get(id=chatId)
-
-		if not chat:
-			logger.warning(
-				"Chat not found",
-				extra={"chat_id": str(chatId)}
-			)
-
-			raise ChatNotFoundException("Chat not found")
+		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
 		if not chat.is_group:
 			logger.warning(
@@ -196,15 +190,7 @@ class ChatService:
 		return update_chat
 
 	async def delete_chat(self, chatId: UUID, user: User) -> dict[str, str]:
-		chat = await self.chat_repo.get(id=chatId)
-
-		if not chat:
-			logger.warning(
-				"Chat not found",
-				extra={"chat_id": str(chatId)}
-			)
-
-			raise ChatNotFoundException("Chat not found")
+		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
 		if not chat.is_group:
 			logger.warning(
@@ -238,15 +224,7 @@ class ChatService:
 
 	async def get_chat_by_id(self, chatId: UUID, user: User) -> ChatResponse: 
 		# implement redis service
-		chat = await self.chat_repo.get(id=chatId)
-
-		if not chat: 
-			logger.warning(
-				"Chat not found",
-				extra={"chat_id": str(chatId)}
-			)
-
-			raise ChatNotFoundException("Chat not found")
+		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
 		chat_participant = await self.chat_participant_repo.get_chat_participant_by_user_id(
 			userId=user.id,
