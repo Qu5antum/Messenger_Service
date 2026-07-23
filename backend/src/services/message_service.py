@@ -6,11 +6,8 @@ from src.database.db import AsyncSession
 from src.database.models import User
 from src.repositories.message_repository import MessageRepository
 from src.api.schemas.message_schema import MessageRequest, MessageResponse, MessageUpdate
-from src.repositories.chat_repository import ChatRepository
-from src.repositories.chat_participant_repository import ChatParticipantRepository
-from src.exception_handlers.user_exceptions import UserNotParticipantInChatException
 from src.exception_handlers.db_exception import DatabaseException
-from src.exception_handlers.message_exception import MessageNotFoundException, MessageNotBelongToUserException
+from src.exception_handlers.message_exception import MessageNotBelongToUserException
 from .helper import Helper
 
 logger = logging.getLogger("message")
@@ -20,8 +17,6 @@ class MessageService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.message_repo = MessageRepository(session=self.session)
-        self.chat_repo = ChatRepository(session=self.session)
-        self.chat_participant_repo = ChatParticipantRepository(session=self.session)
         self.helper = Helper(session=self.session)
 
     async def send_message(self, chatId: UUID, sender: User, message: MessageRequest) -> MessageResponse:
@@ -64,9 +59,9 @@ class MessageService:
             }
         )
 
-        raise new_message
+        return new_message
 
-    async def edit_message(self, messageId: UUID, sender: User, message: MessageUpdate) -> MessageResponse:
+    async def edit_message(self, messageId: UUID, sender: User, message_update: MessageUpdate) -> MessageResponse:
         # implement redis service
         message = await self.helper.get_message_or_404(messageId=messageId)
 
@@ -82,7 +77,7 @@ class MessageService:
             raise MessageNotBelongToUserException("Message not belong to user")
 
         try:
-            data = message.model_dump(exclude_unset=True)
+            data = message_update.model_dump(exclude_unset=True)
 
             updated_message = await self.message_repo.update(
                 id=messageId,
