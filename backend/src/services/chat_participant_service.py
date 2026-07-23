@@ -7,8 +7,8 @@ from src.database.models import User
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.repositories.user_repository import UserRepository
-from src.exception_handlers.chat_exception import ChatNotBelongToUserException, ChatIsNotGroupException, OwnerCantLeaveChatException, InvalidChatCreationException
-from src.exception_handlers.user_exceptions import UserNotFoundException, UserAlreadyParticipantInChatException, UserNotParticipantInChatException
+from src.exception_handlers.chat_exception import ChatIsNotGroupException, OwnerCantLeaveChatException, InvalidChatCreationException
+from src.exception_handlers.user_exceptions import UserNotFoundException, UserAlreadyParticipantInChatException
 from src.exception_handlers.db_exception import DatabaseException
 from src.api.schemas.chat_schema import ChatParticipantResponse
 from .helper import Helper

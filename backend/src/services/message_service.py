@@ -28,21 +28,10 @@ class MessageService:
         # implemet redis service
         await self.helper.get_chat_or_404(chatId=chatId)
 
-        is_participant = await self.chat_participant_repo.is_participant(
-            userId=sender.id, 
+        await self.helper.get_participant_or_400(
+            userId=sender.id,
             chatId=chatId
         )
-
-        if not is_participant:
-            logger.warning(
-                "User not participant in chat",
-                extra={
-                    "chat_id": str(chatId),
-                    "user_id": str(sender.id)
-                }
-            )
-        
-            raise UserNotParticipantInChatException("User not participant in chat")
 
         try:
             new_message = await self.message_repo.create(
@@ -79,15 +68,7 @@ class MessageService:
 
     async def edit_message(self, messageId: UUID, sender: User, message: MessageUpdate) -> MessageResponse:
         # implement redis service
-        message = await self.message_repo.get(id=messageId)
-
-        if not message:
-            logger.warning(
-                "Message not found",
-                extra={"message_id": str(messageId)}
-            )
-
-            raise MessageNotFoundException("Message not found")
+        message = await self.helper.get_message_or_404(messageId=messageId)
 
         if message.sender_id != sender.id:
             logger.warning(
@@ -133,15 +114,7 @@ class MessageService:
         return updated_message
 
     async def delete_message(self, messageId: UUID, user: User) -> dict[str, str]:
-        message = await self.message_repo.get(id=messageId)
-
-        if not message:
-            logger.warning(
-                "Message not found",
-                extra={"message_id": str(messageId)}
-            )
-
-            raise MessageNotFoundException("Message not found")
+        message = await self.helper.get_message_or_404(messageId=messageId)
 
         if message.sender_id != user.id:
             logger.warning(
