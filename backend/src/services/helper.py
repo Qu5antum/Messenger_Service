@@ -79,3 +79,5 @@ class Helper:
 			)
 
 			raise MessageNotFoundException("Message not found")
+
+		return message
