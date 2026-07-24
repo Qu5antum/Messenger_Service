@@ -25,9 +25,9 @@ class ChatService:
 		self.helper = Helper(session=self.session)
 
 	async def create_private_chat(self, phone_number: str, current_user: User) -> ChatResponse:
-		user = await self.user_repo.get_user_id_by_phone_number(phone_number=phone_number)
+		user_id = await self.user_repo.get_user_id_by_phone_number(phone_number=phone_number)
 
-		if not user:
+		if not user_id:
 			logger.warning(
 				"User not found by phone number",
 				extra={"phone_number": phone_number}
@@ -35,7 +35,7 @@ class ChatService:
 
 			raise UserNotFoundException("User not found")
 
-		if user.id == current_user.id:
+		if user_id == current_user.id:
 			logger.warning(
 				"User can't create private chat for yourself",
 				extra={"user_id": str(current_user.id)}
@@ -44,7 +44,7 @@ class ChatService:
 			raise InvalidChatCreationException("User can't create private chat for yourself")
 
 		chat_participant = await self.chat_participant_repo.get_private_chat_of_two_user(
-			userId1=user.id,
+			userId1=user_id,
 			userId2=current_user.id
 		)
 
@@ -58,13 +58,13 @@ class ChatService:
 			new_private_chat = await self.chat_repo.create()
 
 			await self.chat_participant_repo.create(
-				chat_id=new_private_chat.chat_id,
+				chat_id=new_private_chat.id,
 				user_id=current_user.id
 			)
 
 			await self.chat_participant_repo.create(
-				chat_id=new_private_chat.chat_id,
-				user_id=user.id
+				chat_id=new_private_chat.id,
+				user_id=user_id
 			)
 
 			await self.session.commit()
@@ -76,7 +76,7 @@ class ChatService:
 				"Database Error",
 				exc_info=True,
 				extra={
-					"to_user": user.id,
+					"to_user": user_id,
 					"current_user": current_user.id
 				}
 			)
@@ -86,7 +86,7 @@ class ChatService:
 		logger.info(
 			"New chat created, and chat participants added",
 			extra={
-					"to_user": user.id,
+					"to_user": user_id,
 					"current_user": current_user.id
 				}
 			)
@@ -97,7 +97,7 @@ class ChatService:
 		try:
 			new_group_chat = await self.chat_repo.create(
 				is_group=True,
-				title= chat.title,
+				title=chat.title,
 				avatar=chat.avatar,
 				description=chat.description,
 				owner_id=user.id

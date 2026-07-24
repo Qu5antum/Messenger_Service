@@ -57,9 +57,9 @@ class Chat(Base):
     __tablename__ = "chats"
 
     is_group: Mapped[bool] = mapped_column(default=False)
-    title: Mapped[str | None]
-    avatar: Mapped[str | None]
-    description: Mapped[str | None]
+    title: Mapped[str | None] = mapped_column(default=None)
+    avatar: Mapped[str | None] = mapped_column(default=None)
+    description: Mapped[str | None] = mapped_column(default=None)
 
     owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
     owner: Mapped[Optional['User']] = relationship(back_populates="own_chats")
@@ -78,7 +78,7 @@ class ChatParticipant(Base):
     chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
     chat: Mapped['Chat'] = relationship(back_populates="chat_participants")
 
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped['User'] = relationship(back_populates="participation_in_chats")
 
     joined_at: Mapped[datetime.datetime] = mapped_column(
