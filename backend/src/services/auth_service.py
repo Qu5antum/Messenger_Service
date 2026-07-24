@@ -31,13 +31,6 @@ class AuthService:
                 extra={"username": credents.username}
             )
             raise UserNotFoundException("User not found.")
- 
-        if not user.is_active:
-            logger.warning(
-                "Inactive user login attempt",
-                extra={"user_id": str(user.id)}
-            )
-            raise UnauthorizedException("User is unauthorized.")
         
         if not verify_password(credents.password, user.password):
             logger.warning(
@@ -54,7 +47,7 @@ class AuthService:
             expires_delta=access_token_expires
         )
 
-        refresh_token = self.jwt_handler.create_refresh_token(subject=user.email)
+        refresh_token = self.jwt_handler.create_refresh_token(subject=user.username)
 
         logger.info(
             "User login success",

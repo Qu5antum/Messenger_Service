@@ -1,5 +1,5 @@
 import logging
-from sqlalchemy.orm import IntegrityError
+from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 
 from src.database.db import AsyncSession
