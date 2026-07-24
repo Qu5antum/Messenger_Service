@@ -14,9 +14,10 @@ class ChatCreate(BaseModel):
 
 class ChatResponse(BaseModel):
 	id: UUID
-	title: str
-	avatar: str
-	description: str
+	is_group: bool
+	title: Optional[str] = None
+	avatar: Optional[str] = None
+	description: Optional[str] = None
 
 	model_config = ConfigDict(from_attributes=True)
 

@@ -8,6 +8,7 @@ from src.core.logging import setup_logging
 from src.exception_handlers.base_exception import BaseAppException
 from src.api.endpoints.auth_endpoint import auth_route
 from src.api.endpoints.chat_endpoint import chat_route
+from src.api.endpoints.chat_participant_endpoint import chat_participant_route
 from src.core.config import settings
 
 setup_logging()
@@ -44,6 +45,7 @@ app.add_middleware(
 
 app.include_router(auth_route)
 app.include_router(chat_route)
+app.include_router(chat_participant_route)
 
 
 @app.get("/_info", status_code=200)

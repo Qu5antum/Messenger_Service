@@ -8,7 +8,7 @@ from src.api.schemas.chat_schema import ChatCreate, ChatResponse, ChatUpdate
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.user_repository import UserRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
-from src.exception_handlers.user_exceptions import UserNotFoundException, UserNotParticipantInChatException
+from src.exception_handlers.user_exceptions import UserNotFoundException
 from src.exception_handlers.chat_exception import ChatIsNotGroupException, InvalidChatCreationException
 from src.exception_handlers.db_exception import DatabaseException
 from .helper import Helper

@@ -54,6 +54,14 @@ async def delete_chat(
 	return await chatService.delete_chat(chatId=chat_id, user=user)
 
 
+@chat_route.get("/chat/all", response_model=list[ChatResponse], status_code=200)
+async def get_chats(
+	user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
+	chatService: ChatService = Depends(get_chat_service)
+):
+	return await chatService.get_user_chats(user=user)
+
+
 @chat_route.get("/chat/{chat_id}", response_model=ChatResponse, status_code=200)
 async def get_chat(
 	chat_id: UUID,
@@ -61,11 +69,3 @@ async def get_chat(
 	chatService: ChatService = Depends(get_chat_service)
 ):
 	return await chatService.get_chat_by_id(chatId=chat_id, user=user)
-
-
-@chat_route.get("/chat/all", response_model=list[ChatResponse], status_code=200)
-async def get_chats(
-	user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
-	chatService: ChatService = Depends(get_chat_service)
-):
-	return await chatService.get_user_chats(user=user)
