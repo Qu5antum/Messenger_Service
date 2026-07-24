@@ -45,7 +45,7 @@ async def remove_participant(
     )
 
 
-@chat_participant_route.get("/chat/{chat_id}/participants", response_model=ChatParticipantResponse, status_code=200)
+@chat_participant_route.get("/chat/{chat_id}/participants", response_model=list[ChatParticipantResponse], status_code=200)
 async def get_participants(
     chat_id: UUID,
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
