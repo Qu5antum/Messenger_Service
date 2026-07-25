@@ -9,18 +9,20 @@ from src.api.schemas.message_schema import MessageRequest, MessageResponse, Mess
 from src.exception_handlers.db_exception import DatabaseException
 from src.exception_handlers.message_exception import MessageNotBelongToUserException
 from .helper import Helper
+from src.publisher.chat_publisher import ChatPublisher
+from src.redis.redis_service import RedisService
 
 logger = logging.getLogger("message")
 
 
 class MessageService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, redis: RedisService):
         self.session = session
         self.message_repo = MessageRepository(session=self.session)
         self.helper = Helper(session=self.session)
+        self.chat_pub = ChatPublisher(redis=redis)
 
     async def send_message(self, chatId: UUID, sender: User, message: MessageRequest) -> MessageResponse:
-        # implemet redis service
         await self.helper.get_chat_or_404(chatId=chatId)
 
         await self.helper.get_participant_or_400(
@@ -50,6 +52,16 @@ class MessageService:
             )
 
             raise DatabaseException("Message not added")
+
+        await self.chat_pub.publish_message(message=new_message)
+
+        logger.info(
+            "Message published to redis",
+            extra={
+                "chat_id": str(chatId),
+                "message_id": str(new_message.id)
+            }
+        )
 
         logger.info(
             "Message added to database, Message successful response",
