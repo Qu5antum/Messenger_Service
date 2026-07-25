@@ -3,6 +3,7 @@ import os
 from typing import Optional, Any
 import redis.asyncio as aioredis
 from redis.exceptions import RedisError
+from redis.asyncio.client import PubSub
 
 logger = logging.getLogger(__name__)
 
@@ -81,16 +82,91 @@ class RedisService:
             self._client = None
 
     async def incr(self, key: str) -> int:
-        return await self._client.incr(key)
+        self.initialize()
+        try:
+            return await self._client.incr(key)
+        except RedisError as e:
+            logger.error(f"Error incrementing key {key}: {e}")
+            raise
     
     async def decr(self, key: str) -> int:
-        return await self._client.decr(key)
-    
+        self.initialize()
+        try:
+            return await self._client.decr(key)
+        except RedisError as e:
+            logger.error(f"Error decrement key {key}: {e}")
+            raise
+
     async def exists(self, key: str) -> bool:
-        return bool(await self._client.exists(key))
+        self.initialize()
+        try:
+            return bool(await self._client.exists(key))
+        except RedisError as e:
+            logger.error(f"Error exists key {key}: {e}")
+            raise
     
     async def incrbyfloat(self, key: str, amount: float) -> float:
-        return await self._client.incrbyfloat(key, amount)
-    
+        self.initialize()
+        try:
+            return await self._client.incrbyfloat(key, amount)
+        except RedisError as e:
+            logger.error(f"Error increment by float key {key}: {e}")
+            raise 
+
     async def incrby(self, key: str, amount: int) -> int:
-        return await self._client.incrby(key, amount)
+        self.initialize()
+        try:
+            return await self._client.incrby(key, amount)
+        except RedisError as e:
+            logger.error(f"Error increment by key {key}: {e}")
+            raise
+
+    async def publish(self, channel: str, message: str) -> int:
+        self.initialize()
+        try:
+            return await self._client.publish(channel, message)
+        except RedisError as e:
+            logger.error(f"Error publish: {e}")
+            raise
+
+    async def pubsub(self) -> PubSub:
+        self.initialize()
+        try:
+            return self._client.pubsub()
+        except RedisError as e:
+            logger.error(f"Error pubsub: {e}")
+            raise
+
+    async def sadd(self, key: str, user_id: str, ttl_seconds: int = 3600) -> None:
+        """Add a user to the room using SADD."""
+        self.initialize()
+        try:
+            await self._client.sadd(key, user_id)
+            await self._client.expire(key, ttl_seconds)
+        except RedisError as e:
+            logger.error(
+                f"Error user join: {e}",
+                extra={"user_id": str(user_id)}
+            )
+            raise
+
+    async def srem(self, key: str, user_id: str) -> None:
+        """Remove a user from the room using SREM."""
+        self.initialize()
+        try:
+            await self._client.srem(key, user_id)
+        except RedisError as e:
+            logger.error(
+                f"Error user leave: {e}",
+                extra={"user_id": str(user_id)}
+            )
+            raise
+
+    async def smembers(self, key: str) -> set[str]:
+        """Get all members in the room using SMEMBERS."""
+        self.initialize()
+        try:
+            return await self._client.smembers(key)
+        except RedisError as e:
+            logger.error(f"Error get active users: {e}")
+            raise
