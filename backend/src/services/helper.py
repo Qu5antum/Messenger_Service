@@ -10,6 +10,7 @@ from src.exception_handlers.message_exception import MessageNotFoundException
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.repositories.message_repository import MessageRepository
+from src.repositories.user_repository import UserRepository
 
 logger = logging.getLogger("helper")
 
@@ -17,7 +18,8 @@ logger = logging.getLogger("helper")
 class Helper:
 	def __init__(self, session: AsyncSession):
 		self.session = session
-		self.chat_repo = ChatRepository(session=self.session)
+		self.user_repo = UserRepository(session=self.session)
+		self.chat_repo = ChatRepository(session=self.session, user_repo=self.user_repo)
 		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 		self.message_repo = MessageRepository(session=self.session)
 

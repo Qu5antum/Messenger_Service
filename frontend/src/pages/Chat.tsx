@@ -23,13 +23,15 @@ export default function Chat() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
+    const currentUserId = localStorage.getItem('user_id') || ''
+    const currentUsername = localStorage.getItem('username') || ''
+
     useEffect(() => {
         if (!chatId) return
 
         const token = localStorage.getItem('access_token')
         if (!token) return
 
-        // open websocket
         const ws = new WebSocket(buildWsUrl(token))
         wsRef.current = ws
 
@@ -69,14 +71,15 @@ export default function Chat() {
             console.error(err)
             setMessages([])
             setError(String(err?.response?.data || err))
-        } finally { setLoading(false) }
+        } finally {
+            setLoading(false)
+        }
     }
 
     const handleSend = async () => {
         if (!chatId || !text) return
         setError(null)
 
-        // prefer websocket if open
         const ws = wsRef.current
         const payload = {
             type: 'send_message',
@@ -100,7 +103,10 @@ export default function Chat() {
     }
 
     const handleAddParticipant = async () => {
-        if (!chatId || !newParticipantPhone) { setError('Phone required'); return }
+        if (!chatId || !newParticipantPhone) {
+            setError('Phone required')
+            return
+        }
         setError(null)
         try {
             setLoading(true)
@@ -113,50 +119,104 @@ export default function Chat() {
             } else {
                 setError('User not found')
             }
-        } catch (e: any) { console.error(e); setError(String(e?.response?.data || e)) } finally { setLoading(false) }
+        } catch (e: any) {
+            console.error(e)
+            setError(String(e?.response?.data || e))
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (
-        <div>
-            <h2>Chat</h2>
-
-            <div>
-                <input placeholder="Chat ID" value={chatId} onChange={(e) => setChatId(e.target.value)} />
-                <button onClick={loadMessages} disabled={loading}>{loading ? 'Loading...' : 'Load messages'}</button>
+        <div className="chat-page">
+            <div className="chat-header">
+                <div>
+                    <h2>Chat</h2>
+                    <p className="chat-meta">Chat ID: <strong>{chatId || 'none'}</strong></p>
+                </div>
+                <div className="chat-controls">
+                    <input
+                        placeholder="Enter chat ID"
+                        value={chatId}
+                        onChange={(e) => setChatId(e.target.value)}
+                    />
+                    <button onClick={loadMessages} disabled={loading || !chatId}>
+                        {loading ? 'Loading…' : 'Load messages'}
+                    </button>
+                </div>
             </div>
 
-            <div style={{ marginTop: 12 }}>
-                <div style={{ border: '1px solid #ccc', padding: 8, minHeight: 150 }}>
-                    {messages.map((m) => (
-                        <div key={m.id} style={{ padding: 6, borderBottom: '1px solid #eee' }}>
-                            <strong>{m.sender_id === localStorage.getItem('user_id') ? localStorage.getItem('username') || m.sender_id : m.sender_id}</strong>: {m.text}
-                        </div>
-                    ))}
-                </div>
-
-                <div style={{ marginTop: 12 }}>
-                    <h4>Participants</h4>
-                    <ul>
-                        {participants.map(p => (
-                            <li key={p.id}>{p.user_id === localStorage.getItem('user_id') ? (localStorage.getItem('username') || p.user_id) : p.user_id}</li>
-                        ))}
-                    </ul>
-                    <div className="create-row">
-                        <input placeholder="Phone to add" value={newParticipantPhone} onChange={e => setNewParticipantPhone(e.target.value)} />
-                        <button onClick={handleAddParticipant} disabled={loading}>{loading ? 'Adding...' : 'Add'}</button>
+            <div className="chat-grid">
+                <section className="chat-window">
+                    <div className="message-list">
+                        {messages.length === 0 ? (
+                            <div className="empty-state">No messages yet. Load the chat to begin.</div>
+                        ) : (
+                            messages.map((message) => {
+                                const isMine = message.sender_id === currentUserId
+                                const senderName = isMine
+                                    ? currentUsername || 'You'
+                                    : message.sender_id
+                                return (
+                                    <div
+                                        key={message.id}
+                                        className={`message-item ${isMine ? 'mine' : ''}`}
+                                    >
+                                        <div className="message-author">{senderName}</div>
+                                        <div className="message-bubble">{message.text}</div>
+                                    </div>
+                                )
+                            })
+                        )}
                     </div>
-                </div>
 
-                <div style={{ marginTop: 8 }}>
-                    <input style={{ width: '70%' }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Message" />
-                    <button onClick={handleSend}>Send</button>
-                </div>
-            </div>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
+                    <div className="chat-input-row">
+                        <input
+                            placeholder="Write a message..."
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            disabled={!chatId}
+                        />
+                        <button onClick={handleSend} disabled={!chatId || !text.trim()}>
+                            Send
+                        </button>
+                    </div>
+                    {error && <p className="chat-error">{error}</p>}
+                </section>
 
-            <div style={{ marginTop: 8 }}>
-                <input style={{ width: '70%' }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Message" />
-                <button onClick={handleSend} disabled={!text}>{'Send'}</button>
+                <aside className="chat-sidebar">
+                    <div className="sidebar-section">
+                        <h3>Participants</h3>
+                        <p className="muted">{participants.length} participant{participants.length === 1 ? '' : 's'}</p>
+                        <ul className="participants-list">
+                            {participants.map((participant) => {
+                                const isCurrent = participant.user_id === currentUserId
+                                const name = participant.username || participant.user_id
+                                return (
+                                    <li key={participant.id} className={isCurrent ? 'participant-current' : ''}>
+                                        {name}
+                                        {isCurrent && ' (you)'}
+                                    </li>
+                                )
+                            })}
+                        </ul>
+                    </div>
+
+                    <div className="sidebar-section">
+                        <h3>Add participant</h3>
+                        <div className="create-row">
+                            <input
+                                placeholder="Phone number"
+                                value={newParticipantPhone}
+                                onChange={(e) => setNewParticipantPhone(e.target.value)}
+                            />
+                            <button onClick={handleAddParticipant} disabled={!chatId || loading}>
+                                Add
+                            </button>
+                        </div>
+                        <p className="muted">Invite a new user by phone number.</p>
+                    </div>
+                </aside>
             </div>
         </div>
     )

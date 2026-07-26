@@ -19,8 +19,8 @@ logger = logging.getLogger("chat")
 class ChatService:
 	def __init__(self, session: AsyncSession):
 		self.session = session
-		self.chat_repo = ChatRepository(session=self.session)
 		self.user_repo = UserRepository(session=self.session)
+		self.chat_repo = ChatRepository(session=self.session, user_repo=self.user_repo)
 		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 		self.helper = Helper(session=self.session)
 
@@ -222,7 +222,7 @@ class ChatService:
 			for participant in chat_participants
 		]
 
-		chats = await self.chat_repo.get_chats_by_ids(chatIds=chat_ids)
+		chats = await self.chat_repo.get_chats_by_ids(chatIds=chat_ids, current_user_id=user.id)
 
 		logger.info(
 			"Successful chat responses",

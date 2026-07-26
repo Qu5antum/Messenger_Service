@@ -24,18 +24,27 @@ html,
 .chats-list,
 .chat-page {
   background: var(--card);
-  padding: 16px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
 }
 
 input,
 select,
 button {
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
   border: 1px solid #e5e7eb;
   margin-right: 8px;
+  font-size: 0.95rem;
+}
+
+input:focus,
+select:focus,
+button:focus {
+  outline: none;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
 }
 
 button {
@@ -43,6 +52,12 @@ button {
   color: white;
   border: none;
   cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+button:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
 }
 
 .create-row {
