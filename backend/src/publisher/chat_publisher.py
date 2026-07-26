@@ -1,6 +1,6 @@
 import json
 
-from redis.redis_service import RedisService
+from src.redis.redis_service import RedisService
 from src.api.schemas.message_schema import MessageResponse
 
 

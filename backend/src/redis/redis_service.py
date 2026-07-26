@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional, Any
+from typing import Optional, Any, Set
 import redis.asyncio as aioredis
 from redis.exceptions import RedisError
 from redis.asyncio.client import PubSub
@@ -162,7 +162,7 @@ class RedisService:
             )
             raise
 
-    async def smembers(self, key: str) -> set[str]:
+    async def smembers(self, key: str) -> Set[str]:
         """Get all members in the room using SMEMBERS."""
         self.initialize()
         try:

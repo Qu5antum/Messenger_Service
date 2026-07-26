@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { buildWsUrl } from '../api/client'
 import { getMessages, sendMessage } from '../api/messages'
 import { useParams } from 'react-router-dom'
@@ -22,10 +22,6 @@ export default function Chat() {
     const [newParticipantPhone, setNewParticipantPhone] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const { userId, username } = ({} as any)
-    try {
-        // lazy import of useAuth to avoid circular at top-level in tests
-    } catch { }
 
     useEffect(() => {
         if (!chatId) return
