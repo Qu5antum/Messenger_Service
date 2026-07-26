@@ -23,18 +23,30 @@ websocket_route = APIRouter(
 async def get_message_service(session: AsyncSession = Depends(get_session)):
     return MessageService(session=session)
 
-async def get_websocket_service(message_service: MessageService = Depends(get_message_service)):
+def get_websocket_service(message_service: MessageService = Depends(get_message_service)):
     return WebsocketService(manager=manager, message_service=message_service)
 
 @websocket_route.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str, websocket_service: WebsocketService = Depends(get_websocket_service)):
     user_id = await current_user.get_current_user_ws(token=token)
 
-    await manager.connect(websocket=websocket, user_id=user_id)
+    await websocket_service.connect(
+        websocket=websocket,
+        user_id=user_id
+    )
 
     try:
         while True:
             data = await websocket.receive_json()
+
+            event_type = data.get("type")
+
+            if event_type is None:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Missing event type"
+                })
+                return
 
             await websocket_service.handle_event(
                 websocket=websocket,
@@ -45,13 +57,13 @@ async def websocket_endpoint(websocket: WebSocket, token: str, websocket_service
     except WebSocketDisconnect as e:
         logger.error(f"User disconnected: {e}")
 
-        manager.disconnect(user_id=user_id)
+        await websocket_service.disconnect(user_id=user_id)
 
     except UnauthorizedException as e:
         logger.error(f"User unauthorized: {e}")
 
         await websocket.close(code=1008)
 
-        return UnauthorizedException("Invalid user")
+        return 
         
             

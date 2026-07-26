@@ -25,11 +25,16 @@ class WebsocketService:
     async def handle_event(self, websocket: WebSocket, user_id: UUID, data: dict):
         match data["type"]:
             case "send_message":
-                chat_id = UUID(data["chat_id"])
+                try:
+                    chat_id = UUID(data["chat_id"])
+                except ValueError:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Invalid chat_id"
+                    })
+                    return
                 
-                message = MessageRequest(
-                    text=data["payload"]["text"]
-                )
+                message = MessageRequest.model_validate(data["payload"])
 
                 await self.message_service.send_message(
                     chatId=chat_id,
