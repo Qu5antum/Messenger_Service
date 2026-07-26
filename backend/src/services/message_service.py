@@ -22,18 +22,18 @@ class MessageService:
         self.helper = Helper(session=self.session)
         self.chat_pub = ChatPublisher(redis=redis)
 
-    async def send_message(self, chatId: UUID, sender: User, message: MessageRequest) -> MessageResponse:
+    async def send_message(self, chatId: UUID, sender_id: UUID, message: MessageRequest) -> MessageResponse:
         await self.helper.get_chat_or_404(chatId=chatId)
 
         await self.helper.get_participant_or_400(
-            userId=sender.id,
+            userId=sender_id,
             chatId=chatId
         )
 
         try:
             new_message = await self.message_repo.create(
                 text=message.text,
-                sender_id=sender.id,
+                sender_id=sender_id,
                 chat_id=chatId
             )
 
@@ -47,7 +47,7 @@ class MessageService:
                 exc_info=True,
                 extra={
                     "chat_id": str(chatId),
-                    "sender_id": str(sender.id)
+                    "sender_id": str(sender_id)
                 }
             )
 
@@ -67,7 +67,7 @@ class MessageService:
             "Message added to database, Message successful response",
             extra={
                 "chat_id": str(chatId),
-                "sender_id": str(sender.id)
+                "sender_id": str(sender_id)
             }
         )
 

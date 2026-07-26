@@ -26,7 +26,7 @@ async def send_message(
 ):
     return await messageService.send_message(
         chatId=chat_id, 
-        sender=user, 
+        sender_id=user.id, 
         message=message
     )
 
