@@ -37,19 +37,44 @@ export default function Register() {
 
     return (
         <div className="auth-page">
-            <h2>Register</h2>
-            <form onSubmit={onSubmit}>
-                <input name="username" placeholder="Username" value={form.username} onChange={onChange} />
-                <input name="phone_number" placeholder="Phone number" value={form.phone_number} onChange={onChange} />
-                <input name="password" type="password" placeholder="Password" value={form.password} onChange={onChange} />
-                <input name="confirm_password" type="password" placeholder="Confirm password" value={form.confirm_password} onChange={onChange} />
+            <h2>Регистрация</h2>
+            <form className="auth-form" onSubmit={onSubmit}>
+                <input 
+                name="username" 
+                placeholder="Имя пользователя" 
+                value={form.username} 
+                onChange={onChange} 
+                />
+                <input 
+                name="phone_number" 
+                placeholder="Номер телефона" 
+                value={form.phone_number} 
+                onChange={onChange} 
+                />
+                <input 
+                name="password" 
+                type="password" 
+                placeholder="Пароль" 
+                value={form.password} 
+                onChange={onChange} 
+                />
+                <input 
+                name="confirm_password" 
+                type="password" 
+                placeholder="Подтвердите пароль" 
+                value={form.confirm_password} 
+                onChange={onChange} 
+                />
                 <select name="role" value={form.role} onChange={onChange}>
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
+                <option value="user">Пользователь</option>
+                <option value="admin">Администратор</option>
                 </select>
-                <button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Register'}</button>
+                <button type="submit" disabled={loading}>
+                {loading ? 'Создание...' : 'Зарегистрироваться'}
+                </button>
             </form>
-            {msg && <p>{msg}</p>}
-        </div>
+
+            {msg && <p className="error-msg">{msg}</p>}
+            </div>
     )
 }

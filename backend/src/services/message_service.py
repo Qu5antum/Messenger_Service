@@ -53,7 +53,8 @@ class MessageService:
 
             raise DatabaseException("Message not added")
 
-        await self.chat_pub.publish_message(message=new_message)
+        message_response = MessageResponse.model_validate(new_message)
+        await self.chat_pub.publish_message(message=message_response)
 
         logger.info(
             "Message published to redis",
@@ -71,7 +72,7 @@ class MessageService:
             }
         )
 
-        return new_message
+        return message_response
 
     async def edit_message(self, messageId: UUID, sender: User, message_update: MessageUpdate) -> MessageResponse:
         # implement redis service

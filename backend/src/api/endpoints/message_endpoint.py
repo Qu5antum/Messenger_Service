@@ -6,6 +6,7 @@ from src.database.models import User, UserRole
 from src.services.message_service import MessageService
 from src.api.schemas.message_schema import MessageResponse, MessageRequest, MessageUpdate
 from src.api.dependencies.require_role_dependency import require_roles
+from src.redis.redis_service import RedisService
 
 
 message_route = APIRouter(
@@ -13,8 +14,10 @@ message_route = APIRouter(
     tags=["Message"]
 )
 
+redis_service = RedisService()
+
 async def get_message_service(session: AsyncSession = Depends(get_session)):
-    return MessageService(session=session)
+    return MessageService(session=session, redis=redis_service)
 
 
 @message_route.post("/chat/{chat_id}/message/send", response_model=MessageResponse, status_code=201)

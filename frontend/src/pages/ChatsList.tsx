@@ -51,28 +51,58 @@ export default function ChatsList() {
 
     return (
         <div className="chats-list">
-            <h2>Your Chats</h2>
-            <div className="create-row">
-                <input placeholder="Group title" value={title} onChange={e => setTitle(e.target.value)} />
-                <button onClick={createGroup} disabled={loading}>{loading ? 'Creating...' : 'Create Group'}</button>
+            <h2>Чаты</h2>
+
+            <div className="create-section">
+                <div className="create-row">
+                <input 
+                    placeholder="Название группы" 
+                    value={title} 
+                    onChange={e => setTitle(e.target.value)} 
+                />
+                <button onClick={createGroup} disabled={loading}>
+                    {loading ? '...' : 'Создать группу'}
+                </button>
+                </div>
+
+                <div className="create-row">
+                <input 
+                    placeholder="Телефон для личного чата" 
+                    value={phone} 
+                    onChange={e => setPhone(e.target.value)} 
+                />
+                <button onClick={createPrivate} disabled={loading}>
+                    {loading ? '...' : 'Написать'}
+                </button>
+                </div>
             </div>
 
-            <div className="create-row">
-                <input placeholder="Phone for private chat" value={phone} onChange={e => setPhone(e.target.value)} />
-                <button onClick={createPrivate} disabled={loading}>{loading ? 'Creating...' : 'Create Private'}</button>
-            </div>
+            {error && <p className="error-msg">{error}</p>}
 
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-
-            {loading ? <p>Loading...</p> : (
-                <ul>
-                    {chats.map(c => (
-                        <li key={c.id}>
-                            <Link to={`/chat/${c.id}`}>{c.title || (c.is_group ? 'Group' : 'Private')}{c.is_group ? ` (${c.title})` : ''}</Link>
-                        </li>
-                    ))}
+            {loading ? (
+                <p className="muted">Загрузка чатов...</p>
+            ) : (
+                <ul className="chat-items-list">
+                {chats.map(c => {
+                    const name = c.title || (c.is_group ? 'Группа' : 'Личный чат');
+                    return (
+                    <li key={c.id}>
+                        <Link to={`/chat/${c.id}`} className="chat-card">
+                        <div className="chat-avatar">
+                            {name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="chat-info">
+                            <span className="chat-title">{name}</span>
+                            <span className="chat-subtitle">
+                            {c.is_group ? 'Групповой чат' : 'Личная переписка'}
+                            </span>
+                        </div>
+                        </Link>
+                    </li>
+                    );
+                })}
                 </ul>
             )}
-        </div>
+            </div>
     )
 }

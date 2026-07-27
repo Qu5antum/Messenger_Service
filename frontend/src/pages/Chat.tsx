@@ -3,7 +3,6 @@ import { buildWsUrl } from '../api/client'
 import { getMessages, sendMessage } from '../api/messages'
 import { useParams } from 'react-router-dom'
 import { getParticipants, addParticipant } from '../api/chats'
-import { getUserByPhone } from '../api/users'
 
 type Message = {
     id: string
@@ -110,15 +109,10 @@ export default function Chat() {
         setError(null)
         try {
             setLoading(true)
-            const user = await getUserByPhone(newParticipantPhone)
-            if (user?.id) {
-                await addParticipant(chatId, user.id)
-                const parts = await getParticipants(chatId)
-                setParticipants(parts)
-                setNewParticipantPhone('')
-            } else {
-                setError('User not found')
-            }
+            await addParticipant(chatId, newParticipantPhone)
+            const parts = await getParticipants(chatId)
+            setParticipants(parts)
+            setNewParticipantPhone('')
         } catch (e: any) {
             console.error(e)
             setError(String(e?.response?.data || e))

@@ -35,17 +35,34 @@ export default function Login() {
 
     return (
         <div className="auth-page">
-            <h2>Login</h2>
-            <form onSubmit={onSubmit}>
-                <input placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-                <input placeholder="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
-                <button type="submit" disabled={loading}>{loading ? 'Signing...' : 'Login'}</button>
+            <h2>Вход в аккаунт</h2>
+            <form className="auth-form" onSubmit={onSubmit}>
+                <input 
+                placeholder="Имя пользователя" 
+                value={username} 
+                onChange={e => setUsername(e.target.value)} 
+                />
+                <input 
+                placeholder="Пароль" 
+                type="password" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                />
+                <button type="submit" disabled={loading}>
+                {loading ? 'Вход...' : 'Войти'}
+                </button>
             </form>
-            <div style={{ marginTop: 12 }}>
-                <button onClick={() => onDummy('user')} disabled={loading}>Dummy Login (user)</button>
-                <button onClick={() => onDummy('admin')} disabled={loading}>Dummy Login (admin)</button>
+
+            <div className="dummy-buttons">
+                <button onClick={() => onDummy('user')} disabled={loading}>
+                Тест (User)
+                </button>
+                <button onClick={() => onDummy('admin')} disabled={loading}>
+                Тест (Admin)
+                </button>
             </div>
-            {msg && <p>{msg}</p>}
-        </div>
+
+            {msg && <p className="error-msg">{msg}</p>}
+            </div>
     )
 }

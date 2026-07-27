@@ -12,12 +12,12 @@ class ChatPublisher:
         payload = {
             "type": "message_created",
             "chat_id": str(message.chat_id),
-            "data": message.model_dump(mode="json"),
+            "data": message.model_dump(),
         }
 
         await self.redis.publish(
             channel=f"chat:{message.chat_id}",
-            message=json.dumps(payload),
+            message=json.dumps(payload, default=str),
         )
 
         

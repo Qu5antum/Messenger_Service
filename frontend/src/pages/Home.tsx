@@ -5,15 +5,16 @@ export default function Home() {
     const { logout, username } = useAuth()
 
     return (
-        <div>
-            <h2>Home</h2>
-            {username ? <p>Welcome, <strong>{username}</strong></p> : <p>Welcome, guest</p>}
-            <nav>
-                <Link to="/chats">Your Chats</Link> | <Link to="/register">Register</Link> | <Link to="/login">Login</Link>
-            </nav>
-            <div style={{ marginTop: 12 }}>
-                <button onClick={logout}>Logout</button>
+        <header className="app-nav">
+            <div className="nav-user">
+                <span>Привет, <strong>{username || 'Гость'}</strong></span>
             </div>
-        </div>
+            <nav className="nav-links">
+                <Link to="/chats">Чаты</Link>
+                {!username && <Link to="/login">Вход</Link>}
+                {!username && <Link to="/register">Регистрация</Link>}
+                {username && <button className="btn-secondary" onClick={logout}>Выйти</button>}
+            </nav>
+            </header>
     )
 }

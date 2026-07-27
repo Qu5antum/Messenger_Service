@@ -17,16 +17,16 @@ async def get_chat_participant_service(session: AsyncSession = Depends(get_sessi
     return ChatParticipantService(sesison=session)
 
 
-@chat_participant_route.post("/chat/{chat_id}/participant/{user_id}/add_participant", status_code=201)
+@chat_participant_route.post("/chat/{chat_id}/add_participant", status_code=201)
 async def add_participant_to_group_chat(
     chat_id: UUID,
-    user_id: UUID,
+    phone_number: str,
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     chatParticipantService: ChatParticipantService = Depends(get_chat_participant_service)
 ):
     return await chatParticipantService.add_participant_to_group_chat(
         chatId=chat_id, 
-        userId=user_id, 
+        phone_number=phone_number,
         current_user=user
     )
 

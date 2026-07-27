@@ -19,12 +19,12 @@ logger = logging.getLogger("chat_participant")
 class ChatParticipantService:
 	def __init__(self, sesison: AsyncSession):
 		self.session = sesison
-		self.chat_repo = ChatRepository(session=self.session)
-		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 		self.user_repo = UserRepository(session=self.session)
+		self.chat_repo = ChatRepository(session=self.session, user_repo=self.user_repo)
+		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 		self.helper = Helper(session=self.session)
 
-	async def add_participant_to_group_chat(self, chatId: UUID, userId: UUID, current_user: User) -> dict[str, str]:
+	async def add_participant_to_group_chat(self, chatId: UUID, phone_number: str, current_user: User) -> dict[str, str]:
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
 		
 		if not chat.is_group:
@@ -37,17 +37,17 @@ class ChatParticipantService:
 
 		await self.helper.get_owner_or_403(ownerId=current_user.id, chatId=chatId)
 		
-		user = await self.user_repo.get(id=userId)
+		user = await self.user_repo.get_user_by_phone_number(phone_number=phone_number)
 
 		if not user:
 			logger.warning(
 				"User not found by id",
-				extra={"user_id": str(userId)}
+				extra={"phone_number": phone_number}
 			)
 
 			raise UserNotFoundException("User not found")
 
-		if userId == current_user.id:
+		if user.id == current_user.id:
 			logger.warning(
 				"User can't add yourself to chat",
 				extra={
@@ -58,7 +58,7 @@ class ChatParticipantService:
 
 			raise InvalidChatCreationException("User can't add yourself to chat")
 
-		is_participant = await self.chat_participant_repo.is_participant(userId=userId, chatId=chatId)
+		is_participant = await self.chat_participant_repo.is_participant(userId=user.id, chatId=chatId)
 
 		if is_participant:
 			logger.warning(
@@ -74,7 +74,7 @@ class ChatParticipantService:
 		try:
 			await self.chat_participant_repo.create(
 				chat_id=chatId,
-				user_id=userId
+				user_id=user.id
 			)
 
 			await self.session.commit()
@@ -85,7 +85,7 @@ class ChatParticipantService:
 			logger.error(
 				"Database error, new participant not created",
 				exc_info=True,
-				extra={"user_id": str(userId)}
+				extra={"user_id": str(user.id)}
 			)
 
 			raise DatabaseException("Participant not added in chat")
@@ -94,7 +94,7 @@ class ChatParticipantService:
 			"New participant added to the chat",
 			extra={
 				"chat_id": str(chatId),
-				"user_id": str(userId)
+				"user_id": str(user.id)
 			}
 		)
 
