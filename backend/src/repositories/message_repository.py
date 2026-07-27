@@ -1,5 +1,6 @@
 from uuid import UUID
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from .base_repository import BaseRepository
 from src.database.models import Message
@@ -11,6 +12,7 @@ class MessageRepository(BaseRepository):
     async def get_all_messages_by_chat_id(self, chatId: UUID):
         result = await self.session.execute(
             select(self.model)
+            .options(selectinload(self.model.sender))
             .where(self.model.chat_id == chatId)
         )
 

@@ -244,12 +244,14 @@ html,
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background: #f4f5f7;
   border-right: 1px solid var(--border-color);
 }
 
 .message-list {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 20px;
   overflow-y: auto;
   display: flex;
@@ -395,4 +397,37 @@ button:disabled {
   color: var(--danger);
   font-size: 0.85rem;
   margin: 8px 0 0 0;
+}
+
+/* Прокручиваемый список сообщений */
+.message-list {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-behavior: smooth;
+}
+
+.message-list::-webkit-scrollbar,
+.chat-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.message-list::-webkit-scrollbar-track,
+.chat-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.message-list::-webkit-scrollbar-thumb,
+.chat-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+.message-list::-webkit-scrollbar-thumb:hover,
+.chat-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }

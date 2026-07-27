@@ -1,5 +1,6 @@
 from uuid import UUID
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from .base_repository import BaseRepository
 from src.database.models import ChatParticipant
@@ -33,6 +34,7 @@ class ChatParticipantRepository(BaseRepository):
 	async def get_participants(self, chatId: UUID):
 		result = await self.session.execute(
 			select(self.model)
+			.options(selectinload(self.model.user))
 			.where(self.model.chat_id == chatId)
 		)
 

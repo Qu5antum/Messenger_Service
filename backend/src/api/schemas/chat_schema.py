@@ -1,8 +1,9 @@
 import datetime
-
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from uuid import UUID
+
+from .user_schema import UserOut
 
 
 class ChatCreate(BaseModel):
@@ -34,5 +35,6 @@ class ChatParticipantResponse(BaseModel):
 	chat_id: UUID
 	user_id: UUID
 	joined_at: datetime.datetime
+	user: UserOut
 
 	model_config = ConfigDict(from_attributes=True)

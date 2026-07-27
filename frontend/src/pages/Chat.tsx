@@ -9,21 +9,61 @@ type Message = {
     chat_id: string
     sender_id: string
     text: string
+    sender?: {
+        id: string
+        username?: string
+        phone_number?: string
+    }
 }
 
 export default function Chat() {
     const params = useParams()
-    const [chatId, setChatId] = useState(params.chatId || '')
+    const chatId = params.chatId || ''
+
     const [messages, setMessages] = useState<Message[]>([])
     const [text, setText] = useState('')
-    const wsRef = useRef<WebSocket | null>(null)
     const [participants, setParticipants] = useState<any[]>([])
     const [newParticipantPhone, setNewParticipantPhone] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
+    const wsRef = useRef<WebSocket | null>(null)
+    const messagesEndRef = useRef<HTMLDivElement | null>(null)
+
     const currentUserId = localStorage.getItem('user_id') || ''
     const currentUsername = localStorage.getItem('username') || ''
+
+    // Автоматическая прокрутка вниз
+    const scrollToBottom = (smooth = true) => {
+        messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
+    }
+
+    useEffect(() => {
+        if (!chatId) return
+
+        const loadData = async () => {
+            setError(null)
+            try {
+                setLoading(true)
+                const [msgs, parts] = await Promise.all([
+                    getMessages(chatId),
+                    getParticipants(chatId)
+                ])
+                setMessages(msgs)
+                setParticipants(parts)
+                // Скролл в самый низ после загрузки сообщений
+                setTimeout(() => scrollToBottom(false), 50)
+            } catch (err: any) {
+                console.error(err)
+                setMessages([])
+                setError(String(err?.response?.data || err))
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        loadData()
+    }, [chatId])
 
     useEffect(() => {
         if (!chatId) return
@@ -34,22 +74,17 @@ export default function Chat() {
         const ws = new WebSocket(buildWsUrl(token))
         wsRef.current = ws
 
-        ws.onopen = () => {
-            console.log('ws open')
-        }
-
         ws.onmessage = (ev) => {
             try {
                 const payload = JSON.parse(ev.data)
                 if (payload.type === 'message_created' && payload.chat_id === chatId) {
-                    setMessages((m) => [...m, payload.data])
+                    setMessages((prev) => [...prev, payload.data])
+                    scrollToBottom()
                 }
             } catch (e) {
                 console.error('ws message parse error', e)
             }
         }
-
-        ws.onclose = () => console.log('ws closed')
 
         return () => {
             ws.close()
@@ -57,48 +92,40 @@ export default function Chat() {
         }
     }, [chatId])
 
-    const loadMessages = async () => {
-        if (!chatId) return
-        setError(null)
-        try {
-            setLoading(true)
-            const data = await getMessages(chatId)
-            setMessages(data)
-            const parts = await getParticipants(chatId)
-            setParticipants(parts)
-        } catch (err: any) {
-            console.error(err)
-            setMessages([])
-            setError(String(err?.response?.data || err))
-        } finally {
-            setLoading(false)
-        }
-    }
-
     const handleSend = async () => {
-        if (!chatId || !text) return
+        if (!chatId || !text.trim()) return
         setError(null)
+
+        const textToSend = text
+        setText('')
 
         const ws = wsRef.current
         const payload = {
             type: 'send_message',
             chat_id: chatId,
-            payload: { text },
+            payload: { text: textToSend },
         }
 
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(payload))
         } else {
             try {
-                await sendMessage(chatId, text)
-                await loadMessages()
+                await sendMessage(chatId, textToSend)
+                const data = await getMessages(chatId)
+                setMessages(data)
+                scrollToBottom()
             } catch (e: any) {
                 console.error(e)
                 setError(String(e?.response?.data || e))
             }
         }
+    }
 
-        setText('')
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            handleSend()
+        }
     }
 
     const handleAddParticipant = async () => {
@@ -125,32 +152,26 @@ export default function Chat() {
         <div className="chat-page">
             <div className="chat-header">
                 <div>
-                    <h2>Chat</h2>
-                    <p className="chat-meta">Chat ID: <strong>{chatId || 'none'}</strong></p>
-                </div>
-                <div className="chat-controls">
-                    <input
-                        placeholder="Enter chat ID"
-                        value={chatId}
-                        onChange={(e) => setChatId(e.target.value)}
-                    />
-                    <button onClick={loadMessages} disabled={loading || !chatId}>
-                        {loading ? 'Loading…' : 'Load messages'}
-                    </button>
+                    <h2>Чат</h2>
+                    <p className="chat-meta">
+                        {participants.length} {participants.length === 1 ? 'участник' : 'участников'}
+                    </p>
                 </div>
             </div>
 
             <div className="chat-grid">
                 <section className="chat-window">
                     <div className="message-list">
-                        {messages.length === 0 ? (
-                            <div className="empty-state">No messages yet. Load the chat to begin.</div>
+                        {loading && messages.length === 0 ? (
+                            <div className="empty-state">Загрузка сообщений…</div>
+                        ) : messages.length === 0 ? (
+                            <div className="empty-state">Нет сообщений. Напишите первым!</div>
                         ) : (
                             messages.map((message) => {
                                 const isMine = message.sender_id === currentUserId
                                 const senderName = isMine
-                                    ? currentUsername || 'You'
-                                    : message.sender_id
+                                    ? currentUsername || 'Вы'
+                                    : message.sender?.username || message.sender?.phone_number || message.sender_id
                                 return (
                                     <div
                                         key={message.id}
@@ -162,17 +183,20 @@ export default function Chat() {
                                 )
                             })
                         )}
+                        {/* Якорь для прокрутки в самый низ */}
+                        <div ref={messagesEndRef} />
                     </div>
 
                     <div className="chat-input-row">
                         <input
-                            placeholder="Write a message..."
+                            placeholder="Напишите сообщение..."
                             value={text}
                             onChange={(e) => setText(e.target.value)}
+                            onKeyDown={handleKeyDown}
                             disabled={!chatId}
                         />
                         <button onClick={handleSend} disabled={!chatId || !text.trim()}>
-                            Send
+                            Отправить
                         </button>
                     </div>
                     {error && <p className="chat-error">{error}</p>}
@@ -180,16 +204,16 @@ export default function Chat() {
 
                 <aside className="chat-sidebar">
                     <div className="sidebar-section">
-                        <h3>Participants</h3>
-                        <p className="muted">{participants.length} participant{participants.length === 1 ? '' : 's'}</p>
+                        <h3>Участники</h3>
                         <ul className="participants-list">
                             {participants.map((participant) => {
-                                const isCurrent = participant.user_id === currentUserId
-                                const name = participant.username || participant.user_id
+                                const user = participant.user || {}
+                                const isCurrent = user.id === currentUserId || participant.user_id === currentUserId
+                                const name = user.username || user.phone_number || participant.user_id
                                 return (
                                     <li key={participant.id} className={isCurrent ? 'participant-current' : ''}>
                                         {name}
-                                        {isCurrent && ' (you)'}
+                                        {isCurrent && ' (вы)'}
                                     </li>
                                 )
                             })}
@@ -197,18 +221,17 @@ export default function Chat() {
                     </div>
 
                     <div className="sidebar-section">
-                        <h3>Add participant</h3>
+                        <h3>Добавить участника</h3>
                         <div className="create-row">
                             <input
-                                placeholder="Phone number"
+                                placeholder="Номер телефона"
                                 value={newParticipantPhone}
                                 onChange={(e) => setNewParticipantPhone(e.target.value)}
                             />
                             <button onClick={handleAddParticipant} disabled={!chatId || loading}>
-                                Add
+                                Добавить
                             </button>
                         </div>
-                        <p className="muted">Invite a new user by phone number.</p>
                     </div>
                 </aside>
             </div>
