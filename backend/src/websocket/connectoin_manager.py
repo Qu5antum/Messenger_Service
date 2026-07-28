@@ -1,11 +1,13 @@
 from collections import defaultdict
+from datetime import datetime
 from uuid import UUID
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: dict[UUID, set[WebSocket]] = defaultdict(set)
+        self.last_seen: dict[UUID, datetime] = {}
 
     async def connect(self, user_id: UUID, websocket: WebSocket) -> None:
         """
@@ -13,6 +15,7 @@ class ConnectionManager:
         """
         await websocket.accept()
         self.active_connections[user_id].add(websocket)
+        self.last_seen[user_id] = datetime.utcnow()
 
     def disconnect(self, user_id: UUID, websocket: WebSocket) -> None:
         """
@@ -25,6 +28,13 @@ class ConnectionManager:
 
         if not self.active_connections[user_id]:
             del self.active_connections[user_id]
+            self.last_seen.pop(user_id, None)
+
+    def update_last_seen(self, user_id: UUID) -> None:
+        self.last_seen[user_id] = datetime.now(datetime.UTC)
+
+    def get_last_seen(self, user_id: UUID):
+        return self.last_seen.get(user_id)
 
     async def send_to_user(self, user_id: UUID, message: dict) -> None:
         """

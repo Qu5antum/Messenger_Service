@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,6 +13,11 @@ from src.api.endpoints.chat_participant_endpoint import chat_participant_route
 from src.api.endpoints.user_endpoint import user_route
 from src.api.endpoints.message_endpoint import message_route
 from src.api.endpoints.admin_endpoints import admin_route
+from src.api.endpoints.websocket_endpoint import websocket_route, manager as websocket_manager
+from src.database.db import AsyncSession, async_session
+from src.redis.redis_service import RedisService
+from src.subscriber.chat_subsriber import ChatSubscriber
+from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.core.config import settings
 
 setup_logging()
@@ -46,12 +52,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+redis_service = RedisService()
+subscriber: ChatSubscriber | None = None
+subscriber_task: asyncio.Task | None = None
+subscriber_session: AsyncSession | None = None
+
 app.include_router(auth_route)
 app.include_router(user_route)
 app.include_router(chat_route)
 app.include_router(chat_participant_route)
 app.include_router(message_route)
 app.include_router(admin_route)
+app.include_router(websocket_route)
+
+
+@app.on_event("startup")
+async def startup_events():
+    global subscriber, subscriber_task, subscriber_session
+
+    subscriber_session = async_session()
+    participant_repo = ChatParticipantRepository(session=subscriber_session)
+    subscriber = ChatSubscriber(
+        redis=redis_service,
+        manager=websocket_manager,
+        participant_repo=participant_repo,
+    )
+    subscriber_task = asyncio.create_task(subscriber.start())
+
+
+@app.on_event("shutdown")
+async def shutdown_events():
+    global subscriber, subscriber_task, subscriber_session
+
+    if subscriber:
+        await subscriber.stop()
+
+    if subscriber_task:
+        subscriber_task.cancel()
+        try:
+            await subscriber_task
+        except asyncio.CancelledError:
+            pass
+
+    if subscriber_session:
+        await subscriber_session.close()
+
+    await redis_service.close()
 
 
 @app.get("/_info", status_code=200)

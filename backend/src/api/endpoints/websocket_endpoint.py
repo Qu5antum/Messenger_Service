@@ -2,18 +2,18 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 import logging
 
 from src.database.db import AsyncSession, get_session
-from src.websocket.connectoin_manager import ConnectionManager
 from src.auth.jwt_bearer import CurrentUser
 from src.auth.jwt_handler import JWTHandler
 from src.exception_handlers.user_exceptions import UnauthorizedException
+from src.websocket.connectoin_manager import ConnectionManager
 from src.websocket.websocket_service import WebsocketService
 from src.services.message_service import MessageService
 
 logger = logging.getLogger("websocket")
 
 jwt_handler = JWTHandler()
-manager = ConnectionManager()
 current_user = CurrentUser(jwt_handler=jwt_handler)
+manager = ConnectionManager()
 
 websocket_route = APIRouter(
     prefix="/api",
@@ -55,9 +55,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str, websocket_service
             )
 
     except WebSocketDisconnect as e:
-        logger.error(f"User disconnected: {e}")
+        logger.info(f"User disconnected: {e}")
 
-        await websocket_service.disconnect(user_id=user_id)
+        await websocket_service.disconnect(user_id=user_id, websocket=websocket)
 
     except UnauthorizedException as e:
         logger.error(f"User unauthorized: {e}")

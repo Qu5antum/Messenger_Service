@@ -1,11 +1,12 @@
+import logging
 from fastapi import WebSocket
 from uuid import UUID
 
-from src.database.db import AsyncSession
-from src.database.models import User
-from .connectoin_manager import ConnectionManager
+from src.websocket.connectoin_manager import ConnectionManager
 from src.services.message_service import MessageService
 from src.api.schemas.message_schema import MessageRequest
+
+logger = logging.getLogger("websocket_service")
 
 
 class WebsocketService:
@@ -16,11 +17,14 @@ class WebsocketService:
     async def connect(self, websocket: WebSocket, user_id: UUID):
         await self.manager.connect(
             websocket=websocket,
-            user_id=user_id
+            user_id=user_id,
         )
 
-    async def disconnect(self, user_id: UUID):
-        self.manager.disconnect(user_id)
+    async def disconnect(self, user_id: UUID, websocket: WebSocket):
+        self.manager.disconnect(
+            user_id=user_id,
+            websocket=websocket,
+        )
 
     async def handle_event(self, websocket: WebSocket, user_id: UUID, data: dict):
         match data["type"]:
