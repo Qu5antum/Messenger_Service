@@ -39,6 +39,7 @@ export default function Chat() {
 
     const currentUserId = localStorage.getItem('user_id') || ''
     const currentUsername = localStorage.getItem('username') || ''
+    const isGroupChat = chat?.is_group === true
 
     // Автоматическая прокрутка вниз
     const scrollToBottom = (smooth = true) => {
@@ -50,21 +51,26 @@ export default function Chat() {
 
         const loadData = async () => {
             setError(null)
-            try {
+            try { 
                 setLoading(true)
-                const [msgs, parts, chatInfo] = await Promise.all([
-                    getMessages(chatId),
-                    getParticipants(chatId),
-                    getChat(chatId),
-                ])
-                setMessages(msgs)
-                setParticipants(parts)
+                const chatInfo = await getChat(chatId)
                 setChat(chatInfo)
+                const msgs = await getMessages(chatId)
+                setMessages(msgs)
+
+                if (chatInfo.is_group) {
+                    const parts = await getParticipants(chatId)
+                    setParticipants(parts)
+                } else {
+                    setParticipants([])
+                }
+
                 // Скролл в самый низ после загрузки сообщений
                 setTimeout(() => scrollToBottom(false), 50)
             } catch (err: any) {
                 console.error(err)
                 setMessages([])
+                setParticipants([])
                 setError(String(err?.response?.data || err))
             } finally {
                 setLoading(false)
@@ -161,8 +167,8 @@ export default function Chat() {
         <div className="chat-page">
             <div className="chat-header">
                 <div>
-                    <h2>{chat?.title || 'Чат'}</h2>
-                    {chat?.is_group !== false && (
+                    <h2>{chat?.title ?? 'Чат'}</h2>
+                    {isGroupChat && (
                         <p className="chat-meta">
                             {participants.length} {participants.length === 1 ? 'участник' : 'участников'}
                         </p>
@@ -213,7 +219,7 @@ export default function Chat() {
                     {error && <p className="chat-error">{error}</p>}
                 </section>
 
-                {chat?.is_group !== false && (
+                {isGroupChat && (
                     <aside className="chat-sidebar">
                         <div className="sidebar-section">
                             <h3>Участники</h3>
