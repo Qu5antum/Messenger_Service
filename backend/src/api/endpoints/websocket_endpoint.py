@@ -5,11 +5,14 @@ from src.database.db import AsyncSession, get_session
 from src.auth.jwt_bearer import CurrentUser
 from src.auth.jwt_handler import JWTHandler
 from src.exception_handlers.user_exceptions import UnauthorizedException
+from src.redis.redis_service import RedisService
 from src.websocket.connectoin_manager import ConnectionManager
 from src.websocket.websocket_service import WebsocketService
 from src.services.message_service import MessageService
 
 logger = logging.getLogger("websocket")
+
+redis_service = RedisService()
 
 jwt_handler = JWTHandler()
 current_user = CurrentUser(jwt_handler=jwt_handler)
@@ -21,7 +24,7 @@ websocket_route = APIRouter(
 )
 
 async def get_message_service(session: AsyncSession = Depends(get_session)):
-    return MessageService(session=session)
+    return MessageService(session=session, redis=redis_service)
 
 def get_websocket_service(message_service: MessageService = Depends(get_message_service)):
     return WebsocketService(manager=manager, message_service=message_service)

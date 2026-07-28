@@ -46,26 +46,28 @@ class CurrentUser:
 
     async def get_current_user_ws(self, token: str):
         try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],)
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
             user_id = payload.get("sub") or payload.get("id")
 
+            if not user_id:
+                logger.warning("Invalid token missing subject")
+                raise UnauthorizedException("Invalid token: missing subject.")
+
+            logger.info(
+                "authenticated user id",
+                extra={"user_id": str(user_id)}
+            )
+
+            return user_id
+
         except JWTError as e:
             logger.error(f"The token has expired: {e}")
-
             raise UnauthorizedException("Invalid or expired token.")
 
         except ValidationException as e:
             logger.error(f"Invalid token: {e}")
-
             raise UnauthorizedException("Invalid token structure.")
-
-        logger.info(
-            "authenticated user id",
-            extra={"user_id": str(user_id)}
-        )
-
-        return user_id
 
         
 

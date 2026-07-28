@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 from fastapi import WebSocket
 
@@ -31,7 +31,7 @@ class ConnectionManager:
             self.last_seen.pop(user_id, None)
 
     def update_last_seen(self, user_id: UUID) -> None:
-        self.last_seen[user_id] = datetime.now(datetime.UTC)
+        self.last_seen[user_id] = datetime.now(timezone.utc)
 
     def get_last_seen(self, user_id: UUID):
         return self.last_seen.get(user_id)
