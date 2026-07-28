@@ -1,5 +1,5 @@
 from uuid import UUID
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from .base_repository import BaseRepository
@@ -12,10 +12,9 @@ class ChatParticipantRepository(BaseRepository):
 	async def get_private_chat_of_two_user(self, userId1: UUID, userId2: UUID):
 		result = await self.session.execute(
 			select(self.model.chat_id)
-			.where(
-				self.model.user_id == userId1,
-				self.model.user_id == userId2
-			)
+			.where(self.model.user_id.in_([userId1, userId2]))
+			.group_by(self.model.chat_id)
+			.having(func.count(self.model.chat_id) == 2)
 		)
 
 		return result.scalar_one_or_none()

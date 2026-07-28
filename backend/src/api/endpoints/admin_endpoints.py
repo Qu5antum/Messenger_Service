@@ -18,4 +18,4 @@ async def delete_chat_admin(
     user: User = Depends(require_roles(UserRole.ADMIN)),
     chatService: ChatService = Depends(get_chat_service)
 ):
-    return await chatService.delete_chat_for_admin(chatId=chat_id, user=user)
+    return await chatService.delete_chat_for_admin(chatId=chat_id)

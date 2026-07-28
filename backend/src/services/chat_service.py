@@ -43,13 +43,13 @@ class ChatService:
 
 			raise InvalidChatCreationException("User can't create private chat for yourself")
 
-		chat_participant = await self.chat_participant_repo.get_private_chat_of_two_user(
+		chat_participant_id = await self.chat_participant_repo.get_private_chat_of_two_user(
 			userId1=user_id,
 			userId2=current_user.id
 		)
 
-		if chat_participant:
-			chat = await self.chat_repo.get(chat_participant.chat_id)
+		if chat_participant_id:
+			chat = await self.chat_repo.get(id=chat_participant_id)
 
 			logger.info("Chat already exists of this users")
 
@@ -200,7 +200,7 @@ class ChatService:
 
 		return {"detail": "Chat successfully deleted"}
 
-	async def delete_chat_for_admin(self, chatId: UUID, user: User):
+	async def delete_chat_for_admin(self, chatId: UUID) -> dict[str, str]:
 		await self.helper.get_chat_or_404(chatId=chatId)
 
 		await self.chat_repo.delete(id=chatId)
