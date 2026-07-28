@@ -30,6 +30,29 @@ class ChatRepository(BaseRepository):
 
 		return result.scalar_one_or_none()
 
+	async def get_chat_if_private_title_as_username(self, chatId: UUID, current_user_id: UUID):
+		result = await self.session.execute(
+			select(self.model)
+			.options(selectinload(self.model.chat_participants))
+			.where(self.model.id == chatId)
+		)
+
+		chat = result.scalar_one_or_none()
+
+		if not chat.is_group:
+			other_participant = next(
+				p for p in chat.chat_participants
+				if p.user_id != current_user_id
+			)
+
+			username = await self.user_repo.get_username_by_user_id(
+				userId=other_participant.user_id
+			)
+
+			chat.title = username
+
+		return chat
+
 	async def get_chats_by_ids(self, chatIds: list[UUID], current_user_id: UUID):
 		result = await self.session.execute(
 			select(self.model)

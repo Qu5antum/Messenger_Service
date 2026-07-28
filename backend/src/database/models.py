@@ -64,7 +64,12 @@ class Chat(Base):
     owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
     owner: Mapped[Optional['User']] = relationship(back_populates="own_chats")
 
-    chat_participants: Mapped[list['ChatParticipant']] = relationship(back_populates="chat")
+    chat_participants: Mapped[list['ChatParticipant']] = relationship(
+        back_populates="chat",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    
     chat_messages: Mapped[list['Message']] = relationship(back_populates="chat", cascade="all, delete-orphan")
 
 

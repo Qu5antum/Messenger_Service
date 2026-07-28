@@ -187,7 +187,7 @@ class ChatService:
 				extra={"chat_id": str(chatId)}
 			)
 
-			raise ChatIsNotGroupException("Chat is private you can't delete it ")
+			raise ChatIsNotGroupException("Chat is private you can't delete it")
 
 		await self.helper.get_owner_or_403(ownerId=user.id, chatId=chatId)
 
@@ -200,11 +200,25 @@ class ChatService:
 
 		return {"detail": "Chat successfully deleted"}
 
+	async def delete_chat_for_admin(self, chatId: UUID, user: User):
+		await self.helper.get_chat_or_404(chatId=chatId)
+
+		await self.chat_repo.delete(id=chatId)
+
+		logger.info(
+			"Chat successfully deleted",
+			extra={"chat_id": str(chatId)}
+		)
+
+		return {"detail": "Chat successfully deleted"}
+
 	async def get_chat_by_id(self, chatId: UUID, user: User) -> ChatResponse: 
 		# implement redis service
-		chat = await self.helper.get_chat_or_404(chatId=chatId)
+		await self.helper.get_chat_or_404(chatId=chatId)
 
 		await self.helper.get_participant_or_400(userId=user.id, chatId=chatId)
+
+		chat = await self.chat_repo.get_chat_if_private_title_as_username(chatId=chatId, current_user_id=user.id)
 
 		logger.info(
 			"Successful response response",

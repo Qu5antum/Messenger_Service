@@ -11,6 +11,7 @@ from src.api.endpoints.chat_endpoint import chat_route
 from src.api.endpoints.chat_participant_endpoint import chat_participant_route
 from src.api.endpoints.user_endpoint import user_route
 from src.api.endpoints.message_endpoint import message_route
+from src.api.endpoints.admin_endpoints import admin_route
 from src.core.config import settings
 
 setup_logging()
@@ -50,6 +51,7 @@ app.include_router(user_route)
 app.include_router(chat_route)
 app.include_router(chat_participant_route)
 app.include_router(message_route)
+app.include_router(admin_route)
 
 
 @app.get("/_info", status_code=200)

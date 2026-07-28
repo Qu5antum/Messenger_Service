@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { buildWsUrl } from '../api/client'
 import { getMessages, sendMessage } from '../api/messages'
 import { useParams } from 'react-router-dom'
-import { getParticipants, addParticipant } from '../api/chats'
+import { getParticipants, addParticipant, getChat } from '../api/chats'
 
 type Message = {
     id: string
@@ -16,12 +16,19 @@ type Message = {
     }
 }
 
+type Chat = {
+    id: string
+    title?: string
+    is_group?: boolean
+}
+
 export default function Chat() {
     const params = useParams()
     const chatId = params.chatId || ''
 
     const [messages, setMessages] = useState<Message[]>([])
     const [text, setText] = useState('')
+    const [chat, setChat] = useState<Chat | null>(null)
     const [participants, setParticipants] = useState<any[]>([])
     const [newParticipantPhone, setNewParticipantPhone] = useState('')
     const [loading, setLoading] = useState(false)
@@ -45,12 +52,14 @@ export default function Chat() {
             setError(null)
             try {
                 setLoading(true)
-                const [msgs, parts] = await Promise.all([
+                const [msgs, parts, chatInfo] = await Promise.all([
                     getMessages(chatId),
-                    getParticipants(chatId)
+                    getParticipants(chatId),
+                    getChat(chatId),
                 ])
                 setMessages(msgs)
                 setParticipants(parts)
+                setChat(chatInfo)
                 // Скролл в самый низ после загрузки сообщений
                 setTimeout(() => scrollToBottom(false), 50)
             } catch (err: any) {
@@ -152,10 +161,12 @@ export default function Chat() {
         <div className="chat-page">
             <div className="chat-header">
                 <div>
-                    <h2>Чат</h2>
-                    <p className="chat-meta">
-                        {participants.length} {participants.length === 1 ? 'участник' : 'участников'}
-                    </p>
+                    <h2>{chat?.title || 'Чат'}</h2>
+                    {chat?.is_group !== false && (
+                        <p className="chat-meta">
+                            {participants.length} {participants.length === 1 ? 'участник' : 'участников'}
+                        </p>
+                    )}
                 </div>
             </div>
 
@@ -202,38 +213,40 @@ export default function Chat() {
                     {error && <p className="chat-error">{error}</p>}
                 </section>
 
-                <aside className="chat-sidebar">
-                    <div className="sidebar-section">
-                        <h3>Участники</h3>
-                        <ul className="participants-list">
-                            {participants.map((participant) => {
-                                const user = participant.user || {}
-                                const isCurrent = user.id === currentUserId || participant.user_id === currentUserId
-                                const name = user.username || user.phone_number || participant.user_id
-                                return (
-                                    <li key={participant.id} className={isCurrent ? 'participant-current' : ''}>
-                                        {name}
-                                        {isCurrent && ' (вы)'}
-                                    </li>
-                                )
-                            })}
-                        </ul>
-                    </div>
-
-                    <div className="sidebar-section">
-                        <h3>Добавить участника</h3>
-                        <div className="create-row">
-                            <input
-                                placeholder="Номер телефона"
-                                value={newParticipantPhone}
-                                onChange={(e) => setNewParticipantPhone(e.target.value)}
-                            />
-                            <button onClick={handleAddParticipant} disabled={!chatId || loading}>
-                                Добавить
-                            </button>
+                {chat?.is_group !== false && (
+                    <aside className="chat-sidebar">
+                        <div className="sidebar-section">
+                            <h3>Участники</h3>
+                            <ul className="participants-list">
+                                {participants.map((participant) => {
+                                    const user = participant.user || {}
+                                    const isCurrent = user.id === currentUserId || participant.user_id === currentUserId
+                                    const name = user.username || user.phone_number || participant.user_id
+                                    return (
+                                        <li key={participant.id} className={isCurrent ? 'participant-current' : ''}>
+                                            {name}
+                                            {isCurrent && ' (вы)'}
+                                        </li>
+                                    )
+                                })}
+                            </ul>
                         </div>
-                    </div>
-                </aside>
+
+                        <div className="sidebar-section">
+                            <h3>Добавить участника</h3>
+                            <div className="create-row">
+                                <input
+                                    placeholder="Номер телефона"
+                                    value={newParticipantPhone}
+                                    onChange={(e) => setNewParticipantPhone(e.target.value)}
+                                />
+                                <button onClick={handleAddParticipant} disabled={!chatId || loading}>
+                                    Добавить
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+                )}
             </div>
         </div>
     )
