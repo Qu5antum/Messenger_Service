@@ -43,7 +43,7 @@ class WebsocketService:
                 await self.message_service.send_message(
                     chatId=chat_id,
                     sender_id=user_id,
-                    message=message,
+                    message_create=message,
                 )
 
             case "ping":

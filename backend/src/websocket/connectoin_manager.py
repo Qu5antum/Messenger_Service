@@ -2,6 +2,9 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from uuid import UUID
 from fastapi import WebSocket
+import logging
+
+logger = logging.getLogger("connection_manager")
 
 
 class ConnectionManager:
@@ -15,7 +18,16 @@ class ConnectionManager:
         """
         await websocket.accept()
         self.active_connections[user_id].add(websocket)
-        self.last_seen[user_id] = datetime.utcnow()
+
+        logger.info(
+            "WebSocket connected",
+            extra={
+                "user_id": str(user_id),
+                "connections": len(self.active_connections[user_id]),
+            }
+        )
+        
+        self.last_seen[user_id] = datetime.now(timezone.utc)
 
     def disconnect(self, user_id: UUID, websocket: WebSocket) -> None:
         """

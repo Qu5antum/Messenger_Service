@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
+from contextlib import asynccontextmanager
 
 from src.middleware.logging_middleware import logging_middleware
 from src.core.logging import setup_logging
@@ -23,8 +24,49 @@ from src.core.config import settings
 setup_logging()
 logger = logging.getLogger("errors")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    subscriber_session = async_session()
+
+    participant_repo = ChatParticipantRepository(
+        session=subscriber_session
+    )
+
+    subscriber = ChatSubscriber(
+        redis=redis_service,
+        manager=websocket_manager,
+        participant_repo=participant_repo,
+    )
+
+    subscriber_task = asyncio.create_task(
+        subscriber.start()
+    )
+
+    logger.info("Chat subscriber task started")
+
+    try:
+        yield
+
+    finally:
+        logger.info("Application shutdown started")
+
+        await subscriber.stop()
+
+        subscriber_task.cancel()
+
+        try:
+            await subscriber_task
+        except asyncio.CancelledError:
+            pass
+
+        await subscriber_session.close()
+
+        await redis_service.close()
+
+        logger.info("Application shutdown completed")
 
 app = FastAPI(
+    lifespan=lifespan,
     title=settings.APP_NAME,
     debug=settings.debug,
     docs_url="/docs",
@@ -64,40 +106,6 @@ app.include_router(chat_participant_route)
 app.include_router(message_route)
 app.include_router(admin_route)
 app.include_router(websocket_route)
-
-
-@app.on_event("startup")
-async def startup_events():
-    global subscriber, subscriber_task, subscriber_session
-
-    subscriber_session = async_session()
-    participant_repo = ChatParticipantRepository(session=subscriber_session)
-    subscriber = ChatSubscriber(
-        redis=redis_service,
-        manager=websocket_manager,
-        participant_repo=participant_repo,
-    )
-    subscriber_task = asyncio.create_task(subscriber.start())
-
-
-@app.on_event("shutdown")
-async def shutdown_events():
-    global subscriber, subscriber_task, subscriber_session
-
-    if subscriber:
-        await subscriber.stop()
-
-    if subscriber_task:
-        subscriber_task.cancel()
-        try:
-            await subscriber_task
-        except asyncio.CancelledError:
-            pass
-
-    if subscriber_session:
-        await subscriber_session.close()
-
-    await redis_service.close()
 
 
 @app.get("/_info", status_code=200)

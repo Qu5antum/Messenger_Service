@@ -22,7 +22,7 @@ class MessageService:
         self.helper = Helper(session=self.session)
         self.chat_pub = ChatPublisher(redis=redis)
 
-    async def send_message(self, chatId: UUID, sender_id: UUID, message: MessageRequest) -> MessageResponse:
+    async def send_message(self, chatId: UUID, sender_id: UUID, message_create: MessageRequest) -> MessageResponse:
         await self.helper.get_chat_or_404(chatId=chatId)
 
         await self.helper.get_participant_or_400(
@@ -32,7 +32,7 @@ class MessageService:
 
         try:
             new_message = await self.message_repo.create(
-                text=message.text,
+                text=message_create.text,
                 sender_id=sender_id,
                 chat_id=chatId
             )
@@ -53,7 +53,20 @@ class MessageService:
 
             raise DatabaseException("Message not added")
 
-        message_response = MessageResponse.model_validate(new_message)
+        message = await self.message_repo.get_message_with_sender(messageId=new_message.id)
+
+        if not message:
+            logger.error(
+                "Created message not found after commit",
+                extra={
+                    "message_id": str(new_message.id),
+                    "chat_id": str(chatId),
+                },
+            )
+
+            raise DatabaseException("Created message not found")
+
+        message_response = MessageResponse.model_validate(message)
         await self.chat_pub.publish_message(message=message_response)
 
         logger.info(

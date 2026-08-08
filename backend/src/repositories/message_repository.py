@@ -1,6 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from typing import Optional
 
 from .base_repository import BaseRepository
 from src.database.models import Message
@@ -28,3 +29,12 @@ class MessageRepository(BaseRepository):
         )
 
         return result.scalars().all()
+
+    async def get_message_with_sender(self, messageId: UUID) -> Optional[Message]:
+        result = await self.session.execute(
+            select(self.model)
+            .options(selectinload(self.model.sender))
+            .where(self.model.id == messageId)
+        )
+
+        return result.scalar_one_or_none()
