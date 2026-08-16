@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from uuid import UUID
 
 from src.database.db import AsyncSession, get_session
 from src.services.user_service import UserService
@@ -23,3 +24,12 @@ async def get_user_by_phone_number(
     userService: UserService = Depends(get_user_service)
 ):
     return await userService.get_user_by_phone_number(phone_number=phone_number)
+
+
+@user_route.get("/user/{user_id}", response_model=UserOut, status_code=200)
+async def get_user_by_id(
+    user_id: UUID,
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
+    userService: UserService = Depends(get_user_service)
+):
+    return await userService.get_user_by_id(user_id=user_id)

@@ -19,6 +19,7 @@ class ChatResponse(BaseModel):
 	title: Optional[str] = None
 	avatar: Optional[str] = None
 	description: Optional[str] = None
+	owner_id: Optional[UUID] = None
 
 	model_config = ConfigDict(from_attributes=True)
 

@@ -49,7 +49,7 @@ class BaseRepository(AbstractRepository):
             select(self.model).where(self.model.id == id)
         )
 
-        return obj
+        return obj.scalar_one_or_none()
      
     async def get_all(self):
         result = await self.session.execute(select(self.model))

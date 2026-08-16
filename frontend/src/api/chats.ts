@@ -10,6 +10,22 @@ export const createPrivateChat = (phone_number: string) =>
 
 export const getChat = (chatId: string) => api.get(`/api/chat/${chatId}`).then(r => r.data)
 
+export type ChatUpdate = {
+    title?: string
+    avatar?: string
+    description?: string
+    owner_id?: string
+}
+
+export const updateChat = (
+    chatId: string,
+    data: ChatUpdate
+) =>
+    api.put(`/api/chat/${chatId}/chat_update`, data).then((r) => r.data)
+
+export const deleteChat = (chatId: string) => 
+    api.delete(`/api/chat/${chatId}/delete`).then((r) => r.data)
+
 export const addParticipant = (chatId: string, phoneNumber: string) =>
     api.post(`/api/chat/${chatId}/add_participant`, null, { params: { phone_number: phoneNumber } }).then(r => r.data)
 
