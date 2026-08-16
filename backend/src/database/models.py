@@ -3,7 +3,7 @@ from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import datetime
-from enum import Enum, unique
+from enum import Enum
 from typing import Optional
 
 
@@ -91,6 +91,12 @@ class ChatParticipant(Base):
         default=lambda: datetime.datetime.now(datetime.UTC), 
     )
 
+class MessageType(str, Enum):
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+    VOICE = "voice"
+    FILE = "file"
 
 class Message(Base):
     __tablename__ = "messages"
@@ -101,7 +107,19 @@ class Message(Base):
     sender_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     sender: Mapped['User'] = relationship(back_populates="messages")
 
-    text: Mapped[str] = mapped_column(nullable=False)
+    text: Mapped[Optional[str] | None] = mapped_column(nullable=False)
+
+    type: Mapped[MessageType] = mapped_column(
+        Enum(MessageType),
+        default=MessageType.TEXT,
+        nullable=False,
+        index=True
+    )
+
+    attachments: Mapped[list["MessageAttachment"]] = relationship(
+        back_populates="message",
+        cascade="all, delete-orphan"
+    )
 
     sent_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
@@ -113,4 +131,51 @@ class Message(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now()
+    )
+
+class MessageAttachment(Base):
+    __tablename__ = "message_attachments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True,
+        default=uuid.uuid4
+    )
+
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False
+    )
+
+    message: Mapped["Message"] = relationship(
+        back_populates="attachments"
+    )
+
+    file_name: Mapped[str] = mapped_column(
+        nullable=False
+    )
+
+    file_key: Mapped[str] = mapped_column(
+        nullable=False,
+        unique=True
+    )
+
+    mime_type: Mapped[str] = mapped_column(
+        nullable=False
+    )
+
+    size: Mapped[int] = mapped_column(
+        nullable=False
+    )
+
+    duration: Mapped[float | None] = mapped_column(
+        nullable=True
+    )
+
+    width: Mapped[int | None] = mapped_column(
+        nullable=True
+    )
+
+    height: Mapped[int | None] = mapped_column(
+        nullable=True
     )
