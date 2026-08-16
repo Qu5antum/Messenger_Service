@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+
 import { buildWsUrl } from '../api/client'
+
 import {
     getMessages,
     sendMessage,
@@ -7,60 +10,164 @@ import {
     deleteMessage,
     searchMessages,
 } from '../api/messages'
-import { useParams } from 'react-router-dom'
-import { getParticipants, addParticipant, getChat } from '../api/chats'
+
+import {
+    getParticipants,
+    addParticipant,
+    getChat,
+    removeParticipant,
+    leaveChat,
+} from '../api/chats'
+
+
+// =========================================
+// Types
+// =========================================
 
 type Message = {
     id: string
     chat_id: string
     sender_id: string
     text: string
+
     sender?: {
         id: string
-        username?: string
-        phone_number?: string
-    }
+        username?: string | null
+        phone_number?: string | null
+    } | null
 }
 
 type Chat = {
     id: string
     title?: string
     is_group?: boolean
+    owner_id?: string | null
 }
 
+type ParticipantUser = {
+    id: string
+    username?: string | null
+    phone_number?: string | null
+}
+
+type Participant = {
+    id: string
+    chat_id: string
+    user_id: string
+    joined_at: string
+
+    user?: ParticipantUser | null
+}
+
+
+// =========================================
+// Component
+// =========================================
+
 export default function Chat() {
-    const params = useParams()
-    const chatId = params.chatId || ''
+    const { chatId = '' } = useParams()
+    const navigate = useNavigate()
+
+    // =========================================
+    // State
+    // =========================================
+
     const [messages, setMessages] = useState<Message[]>([])
     const [text, setText] = useState('')
+
     const [chat, setChat] = useState<Chat | null>(null)
-    const [participants, setParticipants] = useState<any[]>([])
-    const [newParticipantPhone, setNewParticipantPhone] = useState('')
+
+    const [participants, setParticipants] =
+        useState<Participant[]>([])
+
+    const [newParticipantPhone, setNewParticipantPhone] =
+        useState('')
+
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    // Редактирование
-    const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
-    const [editingText, setEditingText] = useState('')
-    const [editingLoading, setEditingLoading] = useState(false)
-    // Удаление
-    const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null)
-    // Поиск
+
+    // =========================================
+    // Message editing
+    // =========================================
+
+    const [editingMessageId, setEditingMessageId] =
+        useState<string | null>(null)
+
+    const [editingText, setEditingText] =
+        useState('')
+
+    const [editingLoading, setEditingLoading] =
+        useState(false)
+
+    // =========================================
+    // Message deleting
+    // =========================================
+
+    const [deletingMessageId, setDeletingMessageId] =
+        useState<string | null>(null)
+
+    // =========================================
+    // Message search
+    // =========================================
+
     const [searchText, setSearchText] = useState('')
-    const [searchResults, setSearchResults] = useState<Message[]>([])
-    const [searchLoading, setSearchLoading] = useState(false)
-    const [isSearching, setIsSearching] = useState(false)
+
+    const [searchResults, setSearchResults] =
+        useState<Message[]>([])
+
+    const [searchLoading, setSearchLoading] =
+        useState(false)
+
+    const [isSearching, setIsSearching] =
+        useState(false)
+
+    // =========================================
+    // Refs
+    // =========================================
+
     const wsRef = useRef<WebSocket | null>(null)
-    const messagesEndRef = useRef<HTMLDivElement | null>(null)
-    const currentUserId = localStorage.getItem('user_id') || ''
-    const currentUsername = localStorage.getItem('username') || ''
 
-    const isGroupChat = chat?.is_group === true
+    const messagesEndRef =
+        useRef<HTMLDivElement | null>(null)
 
-    const scrollToBottom = (smooth = true) => {
+    // =========================================
+    // Current user
+    // =========================================
+
+    const currentUserId =
+        localStorage.getItem('user_id') || ''
+
+    const currentUsername =
+        localStorage.getItem('username') || ''
+
+    // =========================================
+    // Chat permissions
+    // =========================================
+
+    const isGroupChat =
+        chat?.is_group === true
+
+    const isOwner =
+        isGroupChat &&
+        chat?.owner_id === currentUserId
+
+
+    // =========================================
+    // Scroll
+    // =========================================
+
+    const scrollToBottom = (
+        smooth = true
+    ) => {
         messagesEndRef.current?.scrollIntoView({
             behavior: smooth ? 'smooth' : 'auto',
         })
     }
+
+
+    // =========================================
+    // Load chat
+    // =========================================
 
     useEffect(() => {
         if (!chatId) return
@@ -71,14 +178,19 @@ export default function Chat() {
             try {
                 setLoading(true)
 
+                // Chat
                 const chatInfo = await getChat(chatId)
                 setChat(chatInfo)
 
+                // Messages
                 const msgs = await getMessages(chatId)
                 setMessages(msgs)
 
+                // Participants
                 if (chatInfo.is_group) {
-                    const parts = await getParticipants(chatId)
+                    const parts =
+                        await getParticipants(chatId)
+
                     setParticipants(parts)
                 } else {
                     setParticipants([])
@@ -87,10 +199,13 @@ export default function Chat() {
                 setTimeout(() => {
                     scrollToBottom(false)
                 }, 50)
+
             } catch (err: any) {
                 console.error(err)
+
                 setMessages([])
                 setParticipants([])
+
                 setError(
                     String(
                         err?.response?.data?.detail ||
@@ -102,23 +217,36 @@ export default function Chat() {
                 setLoading(false)
             }
         }
+
         loadData()
     }, [chatId])
-    // -----------------------------------------
+
+
+    // =========================================
     // WebSocket
-    // -----------------------------------------
+    // =========================================
 
     useEffect(() => {
         if (!chatId) return
-        const token = localStorage.getItem('access_token')
+
+        const token =
+            localStorage.getItem('access_token')
+
         if (!token) return
-        const ws = new WebSocket(buildWsUrl(token))
+
+        const ws =
+            new WebSocket(buildWsUrl(token))
+
         wsRef.current = ws
-        ws.onmessage = (ev) => {
+
+        ws.onmessage = (event) => {
             try {
-                const payload = JSON.parse(ev.data)
+                const payload =
+                    JSON.parse(event.data)
+
                 if (
-                    payload.type === 'message_created' &&
+                    payload.type ===
+                        'message_created' &&
                     payload.chat_id === chatId
                 ) {
                     setMessages((prev) => [
@@ -128,13 +256,20 @@ export default function Chat() {
 
                     scrollToBottom()
                 }
+
             } catch (e) {
-                console.error('ws message parse error', e)
+                console.error(
+                    'WS message parse error:',
+                    e
+                )
             }
         }
 
-        ws.onerror = (error) => {
-            console.error('WebSocket error:', error)
+        ws.onerror = (event) => {
+            console.error(
+                'WebSocket error:',
+                event
+            )
         }
 
         return () => {
@@ -142,13 +277,19 @@ export default function Chat() {
             wsRef.current = null
         }
     }, [chatId])
+
+
+    // =========================================
     // Send message
+    // =========================================
+
     const handleSend = async () => {
         if (!chatId || !text.trim()) return
 
         setError(null)
 
-        const textToSend = text.trim()
+        const textToSend =
+            text.trim()
 
         setText('')
 
@@ -166,34 +307,45 @@ export default function Chat() {
             ws &&
             ws.readyState === WebSocket.OPEN
         ) {
-            ws.send(JSON.stringify(payload))
-        } else {
-            try {
-                const data = await sendMessage(
+            ws.send(
+                JSON.stringify(payload)
+            )
+
+            return
+        }
+
+        try {
+            const data =
+                await sendMessage(
                     chatId,
                     textToSend
                 )
 
-                setMessages((prev) => [
-                    ...prev,
-                    data,
-                ])
+            setMessages((prev) => [
+                ...prev,
+                data,
+            ])
 
-                scrollToBottom()
-            } catch (e: any) {
-                console.error(e)
+            scrollToBottom()
 
-                setError(
-                    String(
-                        e?.response?.data?.detail ||
-                        e?.response?.data ||
-                        e
-                    )
+        } catch (e: any) {
+            console.error(e)
+
+            setError(
+                String(
+                    e?.response?.data?.detail ||
+                    e?.response?.data ||
+                    e
                 )
-            }
+            )
         }
     }
-    // Enter
+
+
+    // =========================================
+    // Message Enter
+    // =========================================
+
     const handleKeyDown = (
         e: React.KeyboardEvent<HTMLInputElement>
     ) => {
@@ -206,7 +358,11 @@ export default function Chat() {
         }
     }
 
-    // Start editing
+
+    // =========================================
+    // Start message edit
+    // =========================================
+
     const handleStartEdit = (
         message: Message
     ) => {
@@ -215,20 +371,32 @@ export default function Chat() {
         setError(null)
     }
 
-    // Cancel editing
+
+    // =========================================
+    // Cancel message edit
+    // =========================================
+
     const handleCancelEdit = () => {
         setEditingMessageId(null)
         setEditingText('')
     }
 
-    // Save edited message
+
+    // =========================================
+    // Save message edit
+    // =========================================
+
     const handleSaveEdit = async () => {
         if (!editingMessageId) return
 
-        const newText = editingText.trim()
+        const newText =
+            editingText.trim()
 
         if (!newText) {
-            setError('Сообщение не может быть пустым')
+            setError(
+                'Сообщение не может быть пустым'
+            )
+
             return
         }
 
@@ -236,30 +404,32 @@ export default function Chat() {
             setEditingLoading(true)
             setError(null)
 
-            const updatedMessage = await editMessage(
-                editingMessageId,
-                newText
-            )
+            const updatedMessage =
+                await editMessage(
+                    editingMessageId,
+                    newText
+                )
 
             setMessages((prev) =>
                 prev.map((message) =>
-                    message.id === editingMessageId
+                    message.id ===
+                    editingMessageId
                         ? updatedMessage
                         : message
                 )
             )
 
-            // Если редактируемое сообщение присутствует
-            // в результатах поиска — тоже обновляем его
             setSearchResults((prev) =>
                 prev.map((message) =>
-                    message.id === editingMessageId
+                    message.id ===
+                    editingMessageId
                         ? updatedMessage
                         : message
                 )
             )
 
             handleCancelEdit()
+
         } catch (e: any) {
             console.error(e)
 
@@ -275,14 +445,18 @@ export default function Chat() {
         }
     }
 
-    // Delete message
 
-    const handleDelete = async (
+    // =========================================
+    // Delete message
+    // =========================================
+
+    const handleDeleteMessage = async (
         messageId: string
     ) => {
-        const confirmed = window.confirm(
-            'Удалить это сообщение?'
-        )
+        const confirmed =
+            window.confirm(
+                'Удалить это сообщение?'
+            )
 
         if (!confirmed) return
 
@@ -307,10 +481,12 @@ export default function Chat() {
             )
 
             if (
-                editingMessageId === messageId
+                editingMessageId ===
+                messageId
             ) {
                 handleCancelEdit()
             }
+
         } catch (e: any) {
             console.error(e)
 
@@ -326,12 +502,14 @@ export default function Chat() {
         }
     }
 
-    // -----------------------------------------
+
+    // =========================================
     // Search messages
-    // -----------------------------------------
+    // =========================================
 
     const handleSearch = async () => {
-        const query = searchText.trim()
+        const query =
+            searchText.trim()
 
         if (!chatId || !query) {
             setSearchResults([])
@@ -344,12 +522,14 @@ export default function Chat() {
             setError(null)
             setIsSearching(true)
 
-            const results = await searchMessages(
-                chatId,
-                query
-            )
+            const results =
+                await searchMessages(
+                    chatId,
+                    query
+                )
 
             setSearchResults(results)
+
         } catch (e: any) {
             console.error(e)
 
@@ -362,14 +542,16 @@ export default function Chat() {
             )
 
             setSearchResults([])
+
         } finally {
             setSearchLoading(false)
         }
     }
 
-    // -----------------------------------------
-    // Search input Enter
-    // -----------------------------------------
+
+    // =========================================
+    // Search keyboard
+    // =========================================
 
     const handleSearchKeyDown = (
         e: React.KeyboardEvent<HTMLInputElement>
@@ -386,9 +568,10 @@ export default function Chat() {
         }
     }
 
-    // -----------------------------------------
+
+    // =========================================
     // Clear search
-    // -----------------------------------------
+    // =========================================
 
     const handleClearSearch = () => {
         setSearchText('')
@@ -396,13 +579,20 @@ export default function Chat() {
         setIsSearching(false)
     }
 
-    // -----------------------------------------
+
+    // =========================================
     // Add participant
-    // -----------------------------------------
+    // =========================================
 
     const handleAddParticipant = async () => {
-        if (!chatId || !newParticipantPhone) {
-            setError('Phone required')
+        const phone =
+            newParticipantPhone.trim()
+
+        if (!chatId || !phone) {
+            setError(
+                'Введите номер телефона'
+            )
+
             return
         }
 
@@ -413,14 +603,17 @@ export default function Chat() {
 
             await addParticipant(
                 chatId,
-                newParticipantPhone
+                phone
             )
 
             const parts =
-                await getParticipants(chatId)
+                await getParticipants(
+                    chatId
+                )
 
             setParticipants(parts)
             setNewParticipantPhone('')
+
         } catch (e: any) {
             console.error(e)
 
@@ -436,27 +629,187 @@ export default function Chat() {
         }
     }
 
-    // -----------------------------------------
+
+    // =========================================
+    // Remove participant
+    // =========================================
+
+    const handleRemoveParticipant = async (
+        participant: Participant
+    ) => {
+
+        if (!chatId) return
+
+        // Только владелец может удалять
+        if (!isOwner) {
+            setError(
+                'Только владелец группы может удалять участников'
+            )
+
+            return
+        }
+
+        /*
+         * ВАЖНО:
+         *
+         * Backend:
+         *
+         * DELETE
+         * /chat/{chat_id}/participant/{user_id}/remove_participant
+         *
+         * Поэтому передаем:
+         *
+         * participant.user.id
+         *
+         * НЕ:
+         *
+         * participant.id
+         *
+         * и НЕ:
+         *
+         * participant.user_id
+         */
+
+        const userId = participant.user?.id
+
+        if (!userId) {
+            setError(
+                'Не удалось определить ID пользователя'
+            )
+
+            return
+        }
+
+        // Нельзя удалить самого себя
+        if (userId === currentUserId) {
+            setError(
+                'Нельзя удалить самого себя. Используйте "Покинуть группу".'
+            )
+
+            return
+        }
+
+        const name =
+            participant.user?.username ||
+            participant.user?.phone_number ||
+            userId
+
+        const confirmed =
+            window.confirm(
+                `Удалить пользователя ${name} из группы?`
+            )
+
+        if (!confirmed) return
+
+        try {
+            setLoading(true)
+            setError(null)
+
+            /*
+             * Передаем именно participant.user.id
+             */
+            await removeParticipant(
+                chatId,
+                userId
+            )
+
+            /*
+             * Обновляем список участников
+             */
+            const parts =
+                await getParticipants(
+                    chatId
+                )
+
+            setParticipants(parts)
+
+        } catch (e: any) {
+            console.error(
+                'Remove participant error:',
+                e
+            )
+
+            setError(
+                String(
+                    e?.response?.data?.detail ||
+                    e?.response?.data ||
+                    e
+                )
+            )
+        } finally {
+            setLoading(false)
+        }
+    }
+
+
+    // =========================================
+    // Leave group
+    // =========================================
+
+    const handleLeaveChat = async () => {
+        if (!chatId) return
+
+        const confirmed =
+            window.confirm(
+                'Вы уверены, что хотите покинуть группу?'
+            )
+
+        if (!confirmed) return
+
+        try {
+            setLoading(true)
+            setError(null)
+
+            await leaveChat(chatId)
+
+            if (wsRef.current) {
+                wsRef.current.close()
+                wsRef.current = null
+            }
+
+            navigate('/')
+
+        } catch (e: any) {
+            console.error(e)
+
+            setError(
+                String(
+                    e?.response?.data?.detail ||
+                    e?.response?.data ||
+                    e
+                )
+            )
+        } finally {
+            setLoading(false)
+        }
+    }
+
+
+    // =========================================
     // Render message
-    // -----------------------------------------
+    // =========================================
 
     const renderMessage = (
         message: Message
     ) => {
         const isMine =
-            message.sender_id === currentUserId
+            message.sender_id ===
+            currentUserId
 
-        const senderName = isMine
-            ? currentUsername || 'Вы'
-            : message.sender?.username ||
-              message.sender?.phone_number ||
-              message.sender_id
+        const senderName =
+            isMine
+                ? currentUsername || 'Вы'
+                : message.sender?.username ||
+                  message.sender?.phone_number ||
+                  message.sender_id
 
         const isEditing =
-            editingMessageId === message.id
+            editingMessageId ===
+            message.id
 
         const isDeleting =
-            deletingMessageId === message.id
+            deletingMessageId ===
+            message.id
 
         return (
             <div
@@ -465,12 +818,14 @@ export default function Chat() {
                     isMine ? 'mine' : ''
                 }`}
             >
+
                 <div className="message-author">
                     {senderName}
                 </div>
 
                 {isEditing ? (
                     <div className="message-edit">
+
                         <input
                             value={editingText}
                             onChange={(e) =>
@@ -495,7 +850,9 @@ export default function Chat() {
                         />
 
                         <div className="message-actions">
+
                             <button
+                                type="button"
                                 onClick={
                                     handleSaveEdit
                                 }
@@ -509,6 +866,7 @@ export default function Chat() {
                             </button>
 
                             <button
+                                type="button"
                                 onClick={
                                     handleCancelEdit
                                 }
@@ -518,7 +876,9 @@ export default function Chat() {
                             >
                                 Отмена
                             </button>
+
                         </div>
+
                     </div>
                 ) : (
                     <>
@@ -528,7 +888,9 @@ export default function Chat() {
 
                         {isMine && (
                             <div className="message-actions">
+
                                 <button
+                                    type="button"
                                     onClick={() =>
                                         handleStartEdit(
                                             message
@@ -539,8 +901,9 @@ export default function Chat() {
                                 </button>
 
                                 <button
+                                    type="button"
                                     onClick={() =>
-                                        handleDelete(
+                                        handleDeleteMessage(
                                             message.id
                                         )
                                     }
@@ -552,25 +915,33 @@ export default function Chat() {
                                         ? 'Удаление...'
                                         : 'Удалить'}
                                 </button>
+
                             </div>
                         )}
                     </>
                 )}
+
             </div>
         )
     }
 
+
+    // =========================================
+    // Render
+    // =========================================
+
     return (
         <div className="chat-page">
 
-            {/* -------------------------------- */}
+            {/* ================================= */}
             {/* Header */}
-            {/* -------------------------------- */}
+            {/* ================================= */}
 
             <div className="chat-header">
+
                 <div>
                     <h2>
-                        {chat?.title ?? 'Чат'}
+                        {chat?.title || 'Чат'}
                     </h2>
 
                     {isGroupChat && (
@@ -583,9 +954,11 @@ export default function Chat() {
                     )}
                 </div>
 
-                {/* SEARCH */}
+
+                {/* Search */}
 
                 <div className="chat-search">
+
                     <input
                         placeholder="Поиск сообщений..."
                         value={searchText}
@@ -600,7 +973,10 @@ export default function Chat() {
                     />
 
                     <button
-                        onClick={handleSearch}
+                        type="button"
+                        onClick={
+                            handleSearch
+                        }
                         disabled={
                             searchLoading ||
                             !searchText.trim()
@@ -613,6 +989,7 @@ export default function Chat() {
 
                     {isSearching && (
                         <button
+                            type="button"
                             onClick={
                                 handleClearSearch
                             }
@@ -620,16 +997,21 @@ export default function Chat() {
                             Очистить
                         </button>
                     )}
+
                 </div>
+
             </div>
 
-            {/* -------------------------------- */}
+
+            {/* ================================= */}
             {/* Search results */}
-            {/* -------------------------------- */}
+            {/* ================================= */}
 
             {isSearching && (
                 <div className="search-results">
+
                     <div className="search-results-header">
+
                         <h3>
                             Результаты поиска
                         </h3>
@@ -637,6 +1019,7 @@ export default function Chat() {
                         <span>
                             {searchResults.length}
                         </span>
+
                     </div>
 
                     {searchResults.length === 0 ? (
@@ -645,22 +1028,27 @@ export default function Chat() {
                         </div>
                     ) : (
                         <div className="search-results-list">
+
                             {searchResults.map(
-                                (message) =>
-                                    renderMessage(
-                                        message
-                                    )
+                                renderMessage
                             )}
+
                         </div>
                     )}
+
                 </div>
             )}
 
-            {/* -------------------------------- */}
+
+            {/* ================================= */}
             {/* Main */}
-            {/* -------------------------------- */}
+            {/* ================================= */}
 
             <div className="chat-grid">
+
+                {/* ================================= */}
+                {/* Chat */}
+                {/* ================================= */}
 
                 <section className="chat-window">
 
@@ -671,29 +1059,25 @@ export default function Chat() {
                             <div className="empty-state">
                                 Загрузка сообщений…
                             </div>
-                        ) : messages.length ===
-                          0 ? (
+                        ) : messages.length === 0 ? (
                             <div className="empty-state">
                                 Нет сообщений.
                                 Напишите первым!
                             </div>
                         ) : (
                             messages.map(
-                                (message) =>
-                                    renderMessage(
-                                        message
-                                    )
+                                renderMessage
                             )
                         )}
 
                         <div
                             ref={messagesEndRef}
                         />
+
                     </div>
 
-                    {/* -------------------------------- */}
+
                     {/* Input */}
-                    {/* -------------------------------- */}
 
                     <div className="chat-input-row">
 
@@ -712,7 +1096,10 @@ export default function Chat() {
                         />
 
                         <button
-                            onClick={handleSend}
+                            type="button"
+                            onClick={
+                                handleSend
+                            }
                             disabled={
                                 !chatId ||
                                 !text.trim()
@@ -728,38 +1115,60 @@ export default function Chat() {
                             {error}
                         </p>
                     )}
+
                 </section>
 
-                {/* -------------------------------- */}
+
+                {/* ================================= */}
                 {/* Sidebar */}
-                {/* -------------------------------- */}
+                {/* ================================= */}
 
                 {isGroupChat && (
                     <aside className="chat-sidebar">
 
+                        {/* ================================= */}
+                        {/* Participants */}
+                        {/* ================================= */}
+
                         <div className="sidebar-section">
+
                             <h3>
                                 Участники
                             </h3>
 
                             <ul className="participants-list">
+
                                 {participants.map(
-                                    (
-                                        participant
-                                    ) => {
-                                        const user =
-                                            participant.user ||
-                                            {}
+                                    (participant) => {
+
+                                        /*
+                                         * Здесь принципиально:
+                                         *
+                                         * participant.id
+                                         *   = ID записи участника
+                                         *
+                                         * participant.user_id
+                                         *   = FK пользователя
+                                         *
+                                         * participant.user.id
+                                         *   = ID пользователя
+                                         *
+                                         * Backend remove endpoint
+                                         * ожидает именно user.id.
+                                         */
+
+                                        const participantUserId =
+                                            participant.user?.id
 
                                         const isCurrent =
-                                            user.id ===
+                                            participantUserId ===
                                                 currentUserId ||
                                             participant.user_id ===
                                                 currentUserId
 
                                         const name =
-                                            user.username ||
-                                            user.phone_number ||
+                                            participant.user?.username ||
+                                            participant.user?.phone_number ||
                                             participant.user_id
 
                                         return (
@@ -773,57 +1182,120 @@ export default function Chat() {
                                                         : ''
                                                 }
                                             >
-                                                {name}
 
-                                                {isCurrent &&
-                                                    ' (вы)'}
+                                                <span>
+                                                    {name}
+
+                                                    {isCurrent &&
+                                                        ' (вы)'}
+                                                </span>
+
+
+                                                {/* 
+                                                 * Кнопка удаления
+                                                 * только для owner
+                                                 */}
+
+                                                {isOwner &&
+                                                !isCurrent &&
+                                                participantUserId && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleRemoveParticipant(
+                                                                participant
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            loading
+                                                        }
+                                                    >
+                                                        Удалить
+                                                    </button>
+                                                )}
+
                                             </li>
                                         )
                                     }
                                 )}
+
                             </ul>
+
                         </div>
 
-                        <div className="sidebar-section">
-                            <h3>
-                                Добавить участника
-                            </h3>
 
-                            <div className="create-row">
+                        {/* ================================= */}
+                        {/* Add participant */}
+                        {/* ================================= */}
 
-                                <input
-                                    placeholder="Номер телефона"
-                                    value={
-                                        newParticipantPhone
-                                    }
-                                    onChange={(
-                                        e
-                                    ) =>
-                                        setNewParticipantPhone(
-                                            e.target
-                                                .value
-                                        )
-                                    }
-                                />
+                        {isOwner && (
+                            <div className="sidebar-section">
 
-                                <button
-                                    onClick={
-                                        handleAddParticipant
-                                    }
-                                    disabled={
-                                        !chatId ||
-                                        loading
-                                    }
-                                >
-                                    Добавить
-                                </button>
+                                <h3>
+                                    Добавить участника
+                                </h3>
+
+                                <div className="create-row">
+
+                                    <input
+                                        placeholder="Номер телефона"
+                                        value={
+                                            newParticipantPhone
+                                        }
+                                        onChange={(e) =>
+                                            setNewParticipantPhone(
+                                                e.target.value
+                                            )
+                                        }
+                                    />
+
+                                    <button
+                                        type="button"
+                                        onClick={
+                                            handleAddParticipant
+                                        }
+                                        disabled={
+                                            !chatId ||
+                                            loading
+                                        }
+                                    >
+                                        Добавить
+                                    </button>
+
+                                </div>
 
                             </div>
+                        )}
+
+
+                        {/* ================================= */}
+                        {/* Leave */}
+                        {/* ================================= */}
+
+                        <div className="sidebar-section">
+
+                            <button
+                                type="button"
+                                onClick={
+                                    handleLeaveChat
+                                }
+                                disabled={
+                                    loading
+                                }
+                                className="leave-chat-button"
+                            >
+                                {loading
+                                    ? 'Обработка...'
+                                    : 'Покинуть группу'}
+                            </button>
+
                         </div>
 
                     </aside>
                 )}
+
             </div>
+
         </div>
     )
 }

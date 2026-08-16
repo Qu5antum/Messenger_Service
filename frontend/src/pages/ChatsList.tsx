@@ -359,7 +359,7 @@ export default function ChatsList() {
                 String(chat.id) ===
                 String(chatId)
             ) {
-                navigate('/chats')
+                navigate('/')
             }
         } catch (e: any) {
             console.error(e)

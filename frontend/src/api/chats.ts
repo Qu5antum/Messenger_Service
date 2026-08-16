@@ -31,3 +31,9 @@ export const addParticipant = (chatId: string, phoneNumber: string) =>
 
 export const getParticipants = (chatId: string) =>
     api.get(`/api/chat/${chatId}/participants`).then(r => r.data)
+
+export const removeParticipant = (chatId: string, userId: string) =>
+    api.delete(`/api/chat/${chatId}/participant/${userId}/remove_participant`).then(r => r.data)
+
+export const leaveChat = (chatId: string) =>
+    api.delete(`/api/chat/${chatId}/leave`).then(r => r.data)
