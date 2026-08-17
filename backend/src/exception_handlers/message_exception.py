@@ -9,3 +9,8 @@ class MessageNotFoundException(BaseAppException):
 class MessageNotBelongToUserException(BaseAppException):
 	def __init__(self, message: str):
 		super().__init__(message, status_code=403)
+
+
+class MessageAttachmentNotFoundException(BaseAppException):
+	def __init__(self, message: str):
+		super().__init__(message, status_code=404)

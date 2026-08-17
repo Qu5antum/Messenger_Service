@@ -24,17 +24,31 @@ import {
 // Types
 // =========================================
 
+type MessageAttachment = {
+    id: string
+    message_id: string
+    file_name: string
+    file_key: string
+    mime_type: string
+    size: number
+    duration?: number | null
+}
+
 type Message = {
     id: string
     chat_id: string
     sender_id: string
-    text: string
+    text: string | null
+    sent_at: Date
+    edited_at: Date
 
     sender?: {
         id: string
-        username?: string | null
-        phone_number?: string | null
+        username?: string
+        phone_number?: string
     } | null
+
+    attachments: MessageAttachment[]
 }
 
 type Chat = {
@@ -46,7 +60,7 @@ type Chat = {
 
 type ParticipantUser = {
     id: string
-    username?: string | null
+    username?: string 
     phone_number?: string | null
 }
 
@@ -367,7 +381,7 @@ export default function Chat() {
         message: Message
     ) => {
         setEditingMessageId(message.id)
-        setEditingText(message.text)
+        setEditingText(message.text ?? "")
         setError(null)
     }
 
