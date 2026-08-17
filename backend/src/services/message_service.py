@@ -1,9 +1,11 @@
 from uuid import UUID
+import uuid
 import logging
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from fastapi import UploadFile
 
 from src.database.db import AsyncSession
-from src.database.models import User
+from src.database.models import User, MessageType
 from src.repositories.message_repository import MessageRepository
 from src.api.schemas.message_schema import MessageRequest, MessageResponse, MessageUpdate
 from src.exception_handlers.db_exception import DatabaseException
@@ -11,6 +13,8 @@ from src.exception_handlers.message_exception import MessageNotBelongToUserExcep
 from .helper import Helper
 from src.publisher.chat_publisher import ChatPublisher
 from src.redis.redis_service import RedisService
+from src.repositories.message_attachment_repository import MessageAttachmentRepository
+from .file_service import FileService
 
 logger = logging.getLogger("message")
 
@@ -21,8 +25,26 @@ class MessageService:
         self.message_repo = MessageRepository(session=self.session)
         self.helper = Helper(session=self.session)
         self.chat_pub = ChatPublisher(redis=redis)
+        self.attachment_repo = MessageAttachmentRepository(session=self.session)
+        self.file_service = FileService()
 
-    async def send_message(self, chatId: UUID, sender_id: UUID, message_create: MessageRequest) -> MessageResponse:
+    @staticmethod
+    def _get_message_type(content_type: str | None) -> MessageType:
+        if not content_type:
+            return MessageType.FILE
+
+        if content_type.startswith("image/"):
+            return MessageType.IMAGE
+
+        if content_type.startswith("video/"):
+            return MessageType.VIDEO
+
+        if content_type.startswith("audio/"):
+            return MessageType.VOICE
+
+        return MessageType.FILE
+
+    async def send_message(self, chatId: UUID, sender_id: UUID, message_create: MessageRequest, file: UploadFile | None = None) -> MessageResponse:
         await self.helper.get_chat_or_404(chatId=chatId)
 
         await self.helper.get_participant_or_400(
@@ -30,26 +52,81 @@ class MessageService:
             chatId=chatId
         )
 
+        if not message_create and not file:
+            raise ValueError(
+                "Message must contain text or file"
+            )
+
+        message_type = MessageType.TEXT
+
+        if file:
+            message_type = self._get_message_type(
+                file.content_type
+            )
+
+        file_key = None
+
         try:
             new_message = await self.message_repo.create(
-                text=message_create.text,
+                text=message_create.text if message_create else None,
                 sender_id=sender_id,
-                chat_id=chatId
+                chat_id=chatId,
+                message_type=message_type
             )
+
+            if file:
+                attachment_id = uuid.uuid4()
+
+                file_key, size = (
+                    await self.file_service.save_message_file(
+                        chat_id=chatId,
+                        attachment_id=attachment_id,
+                        file=file,
+                        message_type=message_type.value
+                    )
+                )
+
+                await self.attachment_repo.create(
+                    id=attachment_id,
+                    message_id=new_message.id,
+                    file_name=file.filename,
+                    file_key=file_key,
+                    mime_type=file.content_type,
+                    size=size,
+                )
 
             await self.session.commit()
 
-        except IntegrityError:
+        except IntegrityError as e:
             await self.session.rollback()
 
             logger.error(
-                "Message not added, database error",
+                f"Message not added, database error: {e}",
                 exc_info=True,
                 extra={
                     "chat_id": str(chatId),
                     "sender_id": str(sender_id)
                 }
             )
+
+            if file_key:
+                await self.file_service.delete_file(file_key=file_key)
+
+            raise DatabaseException("Message not added")
+
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+
+            logger.error(
+                f"Message or file not added, database error: {e}",
+                extra={
+                    "chat_id": str(chatId),
+                    "sender_id": str(sender_id)
+                }
+            )
+
+            if file_key:
+                await self.file_service.delete_file(file_key=file_key)
 
             raise DatabaseException("Message not added")
 

@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from uuid import UUID
+from pydantic import ValidationError
 
 from src.database.db import AsyncSession, get_session
 from src.database.models import User, UserRole
@@ -23,16 +24,28 @@ async def get_message_service(session: AsyncSession = Depends(get_session)):
 @message_route.post("/chat/{chat_id}/message/send", response_model=MessageResponse, status_code=201)
 async def send_message(
     chat_id: UUID,
-    message: MessageRequest,
+    message: str | None = Form(None),
+    file: UploadFile | None = File(None),
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     messageService: MessageService = Depends(get_message_service)
 ):
+    message_obj = None
+
+    if message and message.strip():
+        try:
+            message_obj = MessageRequest.model_validate_json(message)
+        except ValidationError:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid message format",
+            )
+
     return await messageService.send_message(
         chatId=chat_id, 
         sender_id=user.id, 
-        message=message
+        message_create=message_obj,
+        file=file
     )
-
 
 @message_route.put("/message/{message_id}/update", response_model=MessageResponse, status_code=200)
 async def edit_message(

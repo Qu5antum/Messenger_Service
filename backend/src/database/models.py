@@ -1,5 +1,6 @@
 from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import datetime
@@ -10,6 +11,13 @@ from typing import Optional
 class UserRole(str, Enum):
     USER = 'user'
     ADMIN = 'admin'
+
+class MessageType(str, Enum):
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+    VOICE = "voice"
+    FILE = "file"
 
 
 class Base(DeclarativeBase):
@@ -91,12 +99,6 @@ class ChatParticipant(Base):
         default=lambda: datetime.datetime.now(datetime.UTC), 
     )
 
-class MessageType(str, Enum):
-    TEXT = "text"
-    IMAGE = "image"
-    VIDEO = "video"
-    VOICE = "voice"
-    FILE = "file"
 
 class Message(Base):
     __tablename__ = "messages"
@@ -107,13 +109,20 @@ class Message(Base):
     sender_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     sender: Mapped['User'] = relationship(back_populates="messages")
 
-    text: Mapped[Optional[str] | None] = mapped_column(nullable=False)
+    text: Mapped[Optional[str]] = mapped_column(nullable=True)
 
-    type: Mapped[MessageType] = mapped_column(
-        Enum(MessageType),
+    message_type: Mapped[MessageType] = mapped_column(
+        SQLEnum(
+            MessageType,
+            name="messagetype",
+            values_callable=lambda enum_cls: [
+                item.value for item in enum_cls
+            ],
+        ),
         default=MessageType.TEXT,
+        server_default=MessageType.TEXT.value,
         nullable=False,
-        index=True
+        index=True,
     )
 
     attachments: Mapped[list["MessageAttachment"]] = relationship(
@@ -169,13 +178,5 @@ class MessageAttachment(Base):
     )
 
     duration: Mapped[float | None] = mapped_column(
-        nullable=True
-    )
-
-    width: Mapped[int | None] = mapped_column(
-        nullable=True
-    )
-
-    height: Mapped[int | None] = mapped_column(
         nullable=True
     )

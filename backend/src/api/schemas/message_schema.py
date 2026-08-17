@@ -3,18 +3,20 @@ from uuid import UUID
 from typing import Optional
 
 from .user_schema import UserOut
+from .message_attachment_schema import MessageAttachmentResponse
 
 
 class MessageRequest(BaseModel):
-	text: str
+	text: str | None = None
 
 
 class MessageResponse(BaseModel):
 	id: UUID
 	chat_id: UUID
 	sender_id: UUID
-	text: str
+	text: str | None
 	sender: UserOut
+	attachments: list[MessageAttachmentResponse]
 
 	model_config = ConfigDict(from_attributes=True)
 

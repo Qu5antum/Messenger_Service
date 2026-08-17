@@ -55,10 +55,7 @@ class FileService:
 
         return str(file_path), size
 
-    async def delete_file(
-        self,
-        file_key: str
-    ) -> None:
+    async def delete_file(self, file_key: str) -> None:
         path = Path(file_key)
 
         if path.exists():
