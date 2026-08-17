@@ -1,4 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+
 
 class Config(BaseSettings):
     DB_HOST: str = "db"
@@ -12,6 +14,7 @@ class Config(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    UPLOAD_DIR: Path = Path("uploads")
 
     APP_NAME: str = "Chating_service"
     debug: bool = True
