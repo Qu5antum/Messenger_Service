@@ -23,4 +23,4 @@ async def get_attachment(
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     message_attachment_service: MessageAttachmentService = Depends(get_message_attachment_service)
 ):
-    return message_attachment_service.get_attachments(chat_id=chat_id, attachment_id=attachemt_id, current_user_id=user.id)
+    return await message_attachment_service.get_attachments(chat_id=chat_id, attachment_id=attachemt_id, current_user_id=user.id)

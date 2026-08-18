@@ -21,7 +21,7 @@ class MessageAttachmentService:
     async def get_attachments(self, chat_id: UUID, attachment_id: UUID, current_user_id: UUID):
         await self.helper.get_chat_or_404(chatId=chat_id)
 
-        await self.helper.get_participant_or_400(userId=current_user_id)
+        await self.helper.get_participant_or_400(userId=current_user_id, chatId=chat_id)
 
         attachment = await self.attachment_repo.get_attachment(attachment_id=attachment_id)
 
@@ -44,12 +44,7 @@ class MessageAttachmentService:
 
             raise MessageAttachmentNotFoundException("Message attachment not found")
 
-        file_path = settings.UPLOAD_DIR / attachment.file_key
-
-        if not file_path.is_file():
-            logger.warning("File not found")
-
-            raise FileNotFoundException("File not found")
+        file_path = attachment.file_key
 
         return FileResponse(
             path=file_path,

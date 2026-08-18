@@ -39,8 +39,8 @@ type Message = {
     chat_id: string
     sender_id: string
     text: string | null
-    sent_at: Date
-    edited_at: Date
+    sent_at: string
+    edited_at: string
 
     sender?: {
         id: string
@@ -60,7 +60,7 @@ type Chat = {
 
 type ParticipantUser = {
     id: string
-    username?: string 
+    username?: string
     phone_number?: string | null
 }
 
@@ -79,17 +79,24 @@ type Participant = {
 // =========================================
 
 export default function Chat() {
+
     const { chatId = '' } = useParams()
+
     const navigate = useNavigate()
+
 
     // =========================================
     // State
     // =========================================
 
-    const [messages, setMessages] = useState<Message[]>([])
-    const [text, setText] = useState('')
+    const [messages, setMessages] =
+        useState<Message[]>([])
 
-    const [chat, setChat] = useState<Chat | null>(null)
+    const [text, setText] =
+        useState('')
+
+    const [chat, setChat] =
+        useState<Chat | null>(null)
 
     const [participants, setParticipants] =
         useState<Participant[]>([])
@@ -97,8 +104,12 @@ export default function Chat() {
     const [newParticipantPhone, setNewParticipantPhone] =
         useState('')
 
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const [loading, setLoading] =
+        useState(false)
+
+    const [error, setError] =
+        useState<string | null>(null)
+
 
     // =========================================
     // Message editing
@@ -113,6 +124,7 @@ export default function Chat() {
     const [editingLoading, setEditingLoading] =
         useState(false)
 
+
     // =========================================
     // Message deleting
     // =========================================
@@ -120,11 +132,13 @@ export default function Chat() {
     const [deletingMessageId, setDeletingMessageId] =
         useState<string | null>(null)
 
+
     // =========================================
-    // Message search
+    // Search
     // =========================================
 
-    const [searchText, setSearchText] = useState('')
+    const [searchText, setSearchText] =
+        useState('')
 
     const [searchResults, setSearchResults] =
         useState<Message[]>([])
@@ -135,14 +149,17 @@ export default function Chat() {
     const [isSearching, setIsSearching] =
         useState(false)
 
+
     // =========================================
     // Refs
     // =========================================
 
-    const wsRef = useRef<WebSocket | null>(null)
+    const wsRef =
+        useRef<WebSocket | null>(null)
 
     const messagesEndRef =
         useRef<HTMLDivElement | null>(null)
+
 
     // =========================================
     // Current user
@@ -153,6 +170,7 @@ export default function Chat() {
 
     const currentUsername =
         localStorage.getItem('username') || ''
+
 
     // =========================================
     // Chat permissions
@@ -167,14 +185,29 @@ export default function Chat() {
 
 
     // =========================================
+    // Attachment URL
+    // =========================================
+
+    const getAttachmentUrl = (
+        attachmentId: string
+    ) => {
+
+        return `http://127.0.0.1:8000/api/chat/${chatId}/attachment/${attachmentId}`
+    }
+
+
+    // =========================================
     // Scroll
     // =========================================
 
     const scrollToBottom = (
         smooth = true
     ) => {
+
         messagesEndRef.current?.scrollIntoView({
-            behavior: smooth ? 'smooth' : 'auto',
+            behavior: smooth
+                ? 'smooth'
+                : 'auto',
         })
     }
 
@@ -184,40 +217,71 @@ export default function Chat() {
     // =========================================
 
     useEffect(() => {
-        if (!chatId) return
+
+        if (!chatId) {
+            return
+        }
 
         const loadData = async () => {
+
             setError(null)
 
             try {
+
                 setLoading(true)
 
+
+                // -----------------------------
                 // Chat
-                const chatInfo = await getChat(chatId)
+                // -----------------------------
+
+                const chatInfo =
+                    await getChat(chatId)
+
                 setChat(chatInfo)
 
+
+                // -----------------------------
                 // Messages
-                const msgs = await getMessages(chatId)
+                // -----------------------------
+
+                const msgs =
+                    await getMessages(chatId)
+
                 setMessages(msgs)
 
+
+                // -----------------------------
                 // Participants
+                // -----------------------------
+
                 if (chatInfo.is_group) {
+
                     const parts =
-                        await getParticipants(chatId)
+                        await getParticipants(
+                            chatId
+                        )
 
                     setParticipants(parts)
+
                 } else {
+
                     setParticipants([])
                 }
 
+
                 setTimeout(() => {
+
                     scrollToBottom(false)
+
                 }, 50)
 
             } catch (err: any) {
+
                 console.error(err)
 
                 setMessages([])
+
                 setParticipants([])
 
                 setError(
@@ -227,12 +291,15 @@ export default function Chat() {
                         err
                     )
                 )
+
             } finally {
+
                 setLoading(false)
             }
         }
 
         loadData()
+
     }, [chatId])
 
 
@@ -241,28 +308,42 @@ export default function Chat() {
     // =========================================
 
     useEffect(() => {
-        if (!chatId) return
+
+        if (!chatId) {
+            return
+        }
 
         const token =
-            localStorage.getItem('access_token')
+            localStorage.getItem(
+                'access_token'
+            )
 
-        if (!token) return
+        if (!token) {
+            return
+        }
 
         const ws =
-            new WebSocket(buildWsUrl(token))
+            new WebSocket(
+                buildWsUrl(token)
+            )
 
         wsRef.current = ws
 
+
         ws.onmessage = (event) => {
+
             try {
+
                 const payload =
                     JSON.parse(event.data)
 
                 if (
                     payload.type ===
                         'message_created' &&
-                    payload.chat_id === chatId
+                    payload.chat_id ===
+                        chatId
                 ) {
+
                     setMessages((prev) => [
                         ...prev,
                         payload.data,
@@ -272,6 +353,7 @@ export default function Chat() {
                 }
 
             } catch (e) {
+
                 console.error(
                     'WS message parse error:',
                     e
@@ -279,17 +361,23 @@ export default function Chat() {
             }
         }
 
+
         ws.onerror = (event) => {
+
             console.error(
                 'WebSocket error:',
                 event
             )
         }
 
+
         return () => {
+
             ws.close()
+
             wsRef.current = null
         }
+
     }, [chatId])
 
 
@@ -298,7 +386,13 @@ export default function Chat() {
     // =========================================
 
     const handleSend = async () => {
-        if (!chatId || !text.trim()) return
+
+        if (
+            !chatId ||
+            !text.trim()
+        ) {
+            return
+        }
 
         setError(null)
 
@@ -307,20 +401,28 @@ export default function Chat() {
 
         setText('')
 
-        const ws = wsRef.current
+        const ws =
+            wsRef.current
+
 
         const payload = {
+
             type: 'send_message',
+
             chat_id: chatId,
+
             payload: {
                 text: textToSend,
             },
         }
 
+
         if (
             ws &&
-            ws.readyState === WebSocket.OPEN
+            ws.readyState ===
+                WebSocket.OPEN
         ) {
+
             ws.send(
                 JSON.stringify(payload)
             )
@@ -328,7 +430,9 @@ export default function Chat() {
             return
         }
 
+
         try {
+
             const data =
                 await sendMessage(
                     chatId,
@@ -343,6 +447,7 @@ export default function Chat() {
             scrollToBottom()
 
         } catch (e: any) {
+
             console.error(e)
 
             setError(
@@ -363,11 +468,14 @@ export default function Chat() {
     const handleKeyDown = (
         e: React.KeyboardEvent<HTMLInputElement>
     ) => {
+
         if (
             e.key === 'Enter' &&
             !e.shiftKey
         ) {
+
             e.preventDefault()
+
             handleSend()
         }
     }
@@ -380,8 +488,15 @@ export default function Chat() {
     const handleStartEdit = (
         message: Message
     ) => {
-        setEditingMessageId(message.id)
-        setEditingText(message.text ?? "")
+
+        setEditingMessageId(
+            message.id
+        )
+
+        setEditingText(
+            message.text ?? ''
+        )
+
         setError(null)
     }
 
@@ -391,7 +506,9 @@ export default function Chat() {
     // =========================================
 
     const handleCancelEdit = () => {
+
         setEditingMessageId(null)
+
         setEditingText('')
     }
 
@@ -401,12 +518,16 @@ export default function Chat() {
     // =========================================
 
     const handleSaveEdit = async () => {
-        if (!editingMessageId) return
+
+        if (!editingMessageId) {
+            return
+        }
 
         const newText =
             editingText.trim()
 
         if (!newText) {
+
             setError(
                 'Сообщение не может быть пустым'
             )
@@ -415,14 +536,18 @@ export default function Chat() {
         }
 
         try {
+
             setEditingLoading(true)
+
             setError(null)
+
 
             const updatedMessage =
                 await editMessage(
                     editingMessageId,
                     newText
                 )
+
 
             setMessages((prev) =>
                 prev.map((message) =>
@@ -433,6 +558,7 @@ export default function Chat() {
                 )
             )
 
+
             setSearchResults((prev) =>
                 prev.map((message) =>
                     message.id ===
@@ -442,9 +568,11 @@ export default function Chat() {
                 )
             )
 
+
             handleCancelEdit()
 
         } catch (e: any) {
+
             console.error(e)
 
             setError(
@@ -454,7 +582,9 @@ export default function Chat() {
                     e
                 )
             )
+
         } finally {
+
             setEditingLoading(false)
         }
     }
@@ -467,41 +597,58 @@ export default function Chat() {
     const handleDeleteMessage = async (
         messageId: string
     ) => {
+
         const confirmed =
             window.confirm(
                 'Удалить это сообщение?'
             )
 
-        if (!confirmed) return
+        if (!confirmed) {
+            return
+        }
 
         try {
-            setDeletingMessageId(messageId)
+
+            setDeletingMessageId(
+                messageId
+            )
+
             setError(null)
 
-            await deleteMessage(messageId)
+
+            await deleteMessage(
+                messageId
+            )
+
 
             setMessages((prev) =>
                 prev.filter(
                     (message) =>
-                        message.id !== messageId
+                        message.id !==
+                        messageId
                 )
             )
+
 
             setSearchResults((prev) =>
                 prev.filter(
                     (message) =>
-                        message.id !== messageId
+                        message.id !==
+                        messageId
                 )
             )
+
 
             if (
                 editingMessageId ===
                 messageId
             ) {
+
                 handleCancelEdit()
             }
 
         } catch (e: any) {
+
             console.error(e)
 
             setError(
@@ -511,30 +658,43 @@ export default function Chat() {
                     e
                 )
             )
+
         } finally {
+
             setDeletingMessageId(null)
         }
     }
 
 
     // =========================================
-    // Search messages
+    // Search
     // =========================================
 
     const handleSearch = async () => {
+
         const query =
             searchText.trim()
 
-        if (!chatId || !query) {
+        if (
+            !chatId ||
+            !query
+        ) {
+
             setSearchResults([])
+
             setIsSearching(false)
+
             return
         }
 
         try {
+
             setSearchLoading(true)
+
             setError(null)
+
             setIsSearching(true)
+
 
             const results =
                 await searchMessages(
@@ -542,9 +702,13 @@ export default function Chat() {
                     query
                 )
 
-            setSearchResults(results)
+
+            setSearchResults(
+                results
+            )
 
         } catch (e: any) {
+
             console.error(e)
 
             setError(
@@ -558,6 +722,7 @@ export default function Chat() {
             setSearchResults([])
 
         } finally {
+
             setSearchLoading(false)
         }
     }
@@ -570,14 +735,20 @@ export default function Chat() {
     const handleSearchKeyDown = (
         e: React.KeyboardEvent<HTMLInputElement>
     ) => {
+
         if (e.key === 'Enter') {
+
             e.preventDefault()
+
             handleSearch()
         }
 
         if (e.key === 'Escape') {
+
             setSearchText('')
+
             setSearchResults([])
+
             setIsSearching(false)
         }
     }
@@ -588,8 +759,11 @@ export default function Chat() {
     // =========================================
 
     const handleClearSearch = () => {
+
         setSearchText('')
+
         setSearchResults([])
+
         setIsSearching(false)
     }
 
@@ -599,10 +773,15 @@ export default function Chat() {
     // =========================================
 
     const handleAddParticipant = async () => {
+
         const phone =
             newParticipantPhone.trim()
 
-        if (!chatId || !phone) {
+        if (
+            !chatId ||
+            !phone
+        ) {
+
             setError(
                 'Введите номер телефона'
             )
@@ -613,22 +792,28 @@ export default function Chat() {
         setError(null)
 
         try {
+
             setLoading(true)
+
 
             await addParticipant(
                 chatId,
                 phone
             )
 
+
             const parts =
                 await getParticipants(
                     chatId
                 )
 
+
             setParticipants(parts)
+
             setNewParticipantPhone('')
 
         } catch (e: any) {
+
             console.error(e)
 
             setError(
@@ -638,7 +823,9 @@ export default function Chat() {
                     e
                 )
             )
+
         } finally {
+
             setLoading(false)
         }
     }
@@ -652,10 +839,13 @@ export default function Chat() {
         participant: Participant
     ) => {
 
-        if (!chatId) return
+        if (!chatId) {
+            return
+        }
 
-        // Только владелец может удалять
+
         if (!isOwner) {
+
             setError(
                 'Только владелец группы может удалять участников'
             )
@@ -663,30 +853,12 @@ export default function Chat() {
             return
         }
 
-        /*
-         * ВАЖНО:
-         *
-         * Backend:
-         *
-         * DELETE
-         * /chat/{chat_id}/participant/{user_id}/remove_participant
-         *
-         * Поэтому передаем:
-         *
-         * participant.user.id
-         *
-         * НЕ:
-         *
-         * participant.id
-         *
-         * и НЕ:
-         *
-         * participant.user_id
-         */
 
-        const userId = participant.user?.id
+        const userId =
+            participant.user?.id
 
         if (!userId) {
+
             setError(
                 'Не удалось определить ID пользователя'
             )
@@ -694,42 +866,49 @@ export default function Chat() {
             return
         }
 
-        // Нельзя удалить самого себя
-        if (userId === currentUserId) {
+
+        if (
+            userId ===
+            currentUserId
+        ) {
+
             setError(
-                'Нельзя удалить самого себя. Используйте "Покинуть группу".'
+                'Нельзя удалить самого себя'
             )
 
             return
         }
+
 
         const name =
             participant.user?.username ||
             participant.user?.phone_number ||
             userId
 
+
         const confirmed =
             window.confirm(
                 `Удалить пользователя ${name} из группы?`
             )
 
-        if (!confirmed) return
+        if (!confirmed) {
+            return
+        }
+
 
         try {
+
             setLoading(true)
+
             setError(null)
 
-            /*
-             * Передаем именно participant.user.id
-             */
+
             await removeParticipant(
                 chatId,
                 userId
             )
 
-            /*
-             * Обновляем список участников
-             */
+
             const parts =
                 await getParticipants(
                     chatId
@@ -738,6 +917,7 @@ export default function Chat() {
             setParticipants(parts)
 
         } catch (e: any) {
+
             console.error(
                 'Remove participant error:',
                 e
@@ -750,7 +930,9 @@ export default function Chat() {
                     e
                 )
             )
+
         } finally {
+
             setLoading(false)
         }
     }
@@ -761,29 +943,46 @@ export default function Chat() {
     // =========================================
 
     const handleLeaveChat = async () => {
-        if (!chatId) return
+
+        if (!chatId) {
+            return
+        }
+
 
         const confirmed =
             window.confirm(
                 'Вы уверены, что хотите покинуть группу?'
             )
 
-        if (!confirmed) return
+        if (!confirmed) {
+            return
+        }
+
 
         try {
+
             setLoading(true)
+
             setError(null)
 
-            await leaveChat(chatId)
+
+            await leaveChat(
+                chatId
+            )
+
 
             if (wsRef.current) {
+
                 wsRef.current.close()
+
                 wsRef.current = null
             }
+
 
             navigate('/')
 
         } catch (e: any) {
+
             console.error(e)
 
             setError(
@@ -793,9 +992,160 @@ export default function Chat() {
                     e
                 )
             )
+
         } finally {
+
             setLoading(false)
         }
+    }
+
+
+    // =========================================
+    // Render attachment
+    // =========================================
+
+    const renderAttachment = (
+        attachment: MessageAttachment
+    ) => {
+
+        const url =
+            getAttachmentUrl(
+                attachment.id
+            )
+
+
+        // -----------------------------
+        // Image
+        // -----------------------------
+
+        if (
+            attachment.mime_type.startsWith(
+                'image/'
+            )
+        ) {
+
+            return (
+                <div
+                    key={attachment.id}
+                    className="message-attachment image-attachment"
+                >
+
+                    <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+
+                        <img
+                            src={url}
+                            alt={
+                                attachment.file_name
+                            }
+                            className="chat-image"
+                        />
+
+                    </a>
+
+                    <div className="attachment-name">
+                        {attachment.file_name}
+                    </div>
+
+                </div>
+            )
+        }
+
+
+        // -----------------------------
+        // Video
+        // -----------------------------
+
+        if (
+            attachment.mime_type.startsWith(
+                'video/'
+            )
+        ) {
+
+            return (
+                <div
+                    key={attachment.id}
+                    className="message-attachment video-attachment"
+                >
+
+                    <video
+                        src={url}
+                        controls
+                        preload="metadata"
+                        className="chat-video"
+                    />
+
+                    <div className="attachment-name">
+                        {attachment.file_name}
+                    </div>
+
+                </div>
+            )
+        }
+
+
+        // -----------------------------
+        // Audio / Voice
+        // -----------------------------
+
+        if (
+            attachment.mime_type.startsWith(
+                'audio/'
+            )
+        ) {
+
+            return (
+                <div
+                    key={attachment.id}
+                    className="message-attachment audio-attachment"
+                >
+
+                    <audio
+                        src={url}
+                        controls
+                        preload="metadata"
+                    />
+
+                    <div className="attachment-name">
+                        {attachment.file_name}
+                    </div>
+
+                </div>
+            )
+        }
+
+
+        // -----------------------------
+        // Other file
+        // -----------------------------
+
+        return (
+            <div
+                key={attachment.id}
+                className="message-attachment file-attachment"
+            >
+
+                <a
+                    href={url}
+                    download={
+                        attachment.file_name
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+
+                    Скачать файл
+                </a>
+
+                <div className="attachment-name">
+                    {attachment.file_name}
+                </div>
+
+            </div>
+        )
     }
 
 
@@ -806,9 +1156,11 @@ export default function Chat() {
     const renderMessage = (
         message: Message
     ) => {
+
         const isMine =
             message.sender_id ===
             currentUserId
+
 
         const senderName =
             isMine
@@ -817,19 +1169,24 @@ export default function Chat() {
                   message.sender?.phone_number ||
                   message.sender_id
 
+
         const isEditing =
             editingMessageId ===
             message.id
+
 
         const isDeleting =
             deletingMessageId ===
             message.id
 
+
         return (
             <div
                 key={message.id}
                 className={`message-item ${
-                    isMine ? 'mine' : ''
+                    isMine
+                        ? 'mine'
+                        : ''
                 }`}
             >
 
@@ -837,31 +1194,42 @@ export default function Chat() {
                     {senderName}
                 </div>
 
+
                 {isEditing ? (
+
                     <div className="message-edit">
 
                         <input
-                            value={editingText}
+                            value={
+                                editingText
+                            }
                             onChange={(e) =>
                                 setEditingText(
                                     e.target.value
                                 )
                             }
                             onKeyDown={(e) => {
+
                                 if (
-                                    e.key === 'Enter'
+                                    e.key ===
+                                    'Enter'
                                 ) {
+
                                     handleSaveEdit()
                                 }
 
                                 if (
-                                    e.key === 'Escape'
+                                    e.key ===
+                                    'Escape'
                                 ) {
+
                                     handleCancelEdit()
                                 }
+
                             }}
                             autoFocus
                         />
+
 
                         <div className="message-actions">
 
@@ -879,6 +1247,7 @@ export default function Chat() {
                                     : 'Сохранить'}
                             </button>
 
+
                             <button
                                 type="button"
                                 onClick={
@@ -894,13 +1263,45 @@ export default function Chat() {
                         </div>
 
                     </div>
+
                 ) : (
+
                     <>
-                        <div className="message-bubble">
-                            {message.text}
-                        </div>
+
+                        {/* ----------------------------- */}
+                        {/* Text */}
+                        {/* ----------------------------- */}
+
+                        {message.text && (
+                            <div className="message-bubble">
+                                {message.text}
+                            </div>
+                        )}
+
+
+                        {/* ----------------------------- */}
+                        {/* Attachments */}
+                        {/* ----------------------------- */}
+
+                        {message.attachments &&
+                            message.attachments.length > 0 && (
+
+                            <div className="message-attachments">
+
+                                {message.attachments.map(
+                                    renderAttachment
+                                )}
+
+                            </div>
+                        )}
+
+
+                        {/* ----------------------------- */}
+                        {/* Message actions */}
+                        {/* ----------------------------- */}
 
                         {isMine && (
+
                             <div className="message-actions">
 
                                 <button
@@ -913,6 +1314,7 @@ export default function Chat() {
                                 >
                                     Изменить
                                 </button>
+
 
                                 <button
                                     type="button"
@@ -932,6 +1334,7 @@ export default function Chat() {
 
                             </div>
                         )}
+
                     </>
                 )}
 
@@ -945,7 +1348,9 @@ export default function Chat() {
     // =========================================
 
     return (
+
         <div className="chat-page">
+
 
             {/* ================================= */}
             {/* Header */}
@@ -954,18 +1359,27 @@ export default function Chat() {
             <div className="chat-header">
 
                 <div>
+
                     <h2>
-                        {chat?.title || 'Чат'}
+                        {chat?.title ||
+                            'Чат'}
                     </h2>
 
+
                     {isGroupChat && (
+
                         <p className="chat-meta">
+
                             {participants.length}{' '}
-                            {participants.length === 1
+
+                            {participants.length ===
+                            1
                                 ? 'участник'
                                 : 'участников'}
+
                         </p>
                     )}
+
                 </div>
 
 
@@ -975,7 +1389,9 @@ export default function Chat() {
 
                     <input
                         placeholder="Поиск сообщений..."
-                        value={searchText}
+                        value={
+                            searchText
+                        }
                         onChange={(e) =>
                             setSearchText(
                                 e.target.value
@@ -985,6 +1401,7 @@ export default function Chat() {
                             handleSearchKeyDown
                         }
                     />
+
 
                     <button
                         type="button"
@@ -1001,7 +1418,9 @@ export default function Chat() {
                             : 'Найти'}
                     </button>
 
+
                     {isSearching && (
+
                         <button
                             type="button"
                             onClick={
@@ -1010,6 +1429,7 @@ export default function Chat() {
                         >
                             Очистить
                         </button>
+
                     )}
 
                 </div>
@@ -1022,6 +1442,7 @@ export default function Chat() {
             {/* ================================= */}
 
             {isSearching && (
+
                 <div className="search-results">
 
                     <div className="search-results-header">
@@ -1031,16 +1452,23 @@ export default function Chat() {
                         </h3>
 
                         <span>
-                            {searchResults.length}
+                            {
+                                searchResults.length
+                            }
                         </span>
 
                     </div>
 
-                    {searchResults.length === 0 ? (
+
+                    {searchResults.length ===
+                    0 ? (
+
                         <div className="empty-state">
                             Ничего не найдено
                         </div>
+
                     ) : (
+
                         <div className="search-results-list">
 
                             {searchResults.map(
@@ -1060,6 +1488,7 @@ export default function Chat() {
 
             <div className="chat-grid">
 
+
                 {/* ================================= */}
                 {/* Chat */}
                 {/* ================================= */}
@@ -1069,23 +1498,33 @@ export default function Chat() {
                     <div className="message-list">
 
                         {loading &&
-                        messages.length === 0 ? (
+                        messages.length ===
+                            0 ? (
+
                             <div className="empty-state">
                                 Загрузка сообщений…
                             </div>
-                        ) : messages.length === 0 ? (
+
+                        ) : messages.length ===
+                          0 ? (
+
                             <div className="empty-state">
                                 Нет сообщений.
                                 Напишите первым!
                             </div>
+
                         ) : (
+
                             messages.map(
                                 renderMessage
                             )
                         )}
 
+
                         <div
-                            ref={messagesEndRef}
+                            ref={
+                                messagesEndRef
+                            }
                         />
 
                     </div>
@@ -1109,6 +1548,7 @@ export default function Chat() {
                             disabled={!chatId}
                         />
 
+
                         <button
                             type="button"
                             onClick={
@@ -1124,7 +1564,9 @@ export default function Chat() {
 
                     </div>
 
+
                     {error && (
+
                         <p className="chat-error">
                             {error}
                         </p>
@@ -1138,11 +1580,11 @@ export default function Chat() {
                 {/* ================================= */}
 
                 {isGroupChat && (
+
                     <aside className="chat-sidebar">
 
-                        {/* ================================= */}
+
                         {/* Participants */}
-                        {/* ================================= */}
 
                         <div className="sidebar-section">
 
@@ -1150,29 +1592,15 @@ export default function Chat() {
                                 Участники
                             </h3>
 
+
                             <ul className="participants-list">
 
                                 {participants.map(
                                     (participant) => {
 
-                                        /*
-                                         * Здесь принципиально:
-                                         *
-                                         * participant.id
-                                         *   = ID записи участника
-                                         *
-                                         * participant.user_id
-                                         *   = FK пользователя
-                                         *
-                                         * participant.user.id
-                                         *   = ID пользователя
-                                         *
-                                         * Backend remove endpoint
-                                         * ожидает именно user.id.
-                                         */
-
                                         const participantUserId =
                                             participant.user?.id
+
 
                                         const isCurrent =
                                             participantUserId ===
@@ -1180,12 +1608,15 @@ export default function Chat() {
                                             participant.user_id ===
                                                 currentUserId
 
+
                                         const name =
                                             participant.user?.username ||
                                             participant.user?.phone_number ||
                                             participant.user_id
 
+
                                         return (
+
                                             <li
                                                 key={
                                                     participant.id
@@ -1205,14 +1636,10 @@ export default function Chat() {
                                                 </span>
 
 
-                                                {/* 
-                                                 * Кнопка удаления
-                                                 * только для owner
-                                                 */}
-
                                                 {isOwner &&
                                                 !isCurrent &&
                                                 participantUserId && (
+
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -1238,16 +1665,16 @@ export default function Chat() {
                         </div>
 
 
-                        {/* ================================= */}
                         {/* Add participant */}
-                        {/* ================================= */}
 
                         {isOwner && (
+
                             <div className="sidebar-section">
 
                                 <h3>
                                     Добавить участника
                                 </h3>
+
 
                                 <div className="create-row">
 
@@ -1262,6 +1689,7 @@ export default function Chat() {
                                             )
                                         }
                                     />
+
 
                                     <button
                                         type="button"
@@ -1282,9 +1710,7 @@ export default function Chat() {
                         )}
 
 
-                        {/* ================================= */}
                         {/* Leave */}
-                        {/* ================================= */}
 
                         <div className="sidebar-section">
 

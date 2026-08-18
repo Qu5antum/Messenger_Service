@@ -15,6 +15,7 @@ from src.api.endpoints.chat_participant_endpoint import chat_participant_route
 from src.api.endpoints.user_endpoint import user_route
 from src.api.endpoints.message_endpoint import message_route
 from src.api.endpoints.admin_endpoints import admin_route
+from src.api.endpoints.message_attachment_endpoint import message_attachment_route
 from src.api.endpoints.websocket_endpoint import websocket_route, manager as websocket_manager
 from src.database.db import AsyncSession, async_session
 from src.redis.redis_service import RedisService
@@ -105,6 +106,7 @@ app.include_router(user_route)
 app.include_router(chat_route)
 app.include_router(chat_participant_route)
 app.include_router(message_route)
+app.include_router(message_attachment_route)
 app.include_router(admin_route)
 app.include_router(websocket_route)
 
