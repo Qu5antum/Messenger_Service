@@ -35,6 +35,7 @@ class MessageRepository(BaseRepository):
         result = await self.session.execute(
             select(self.model)
             .options(selectinload(self.model.sender))
+            .options(selectinload(self.model.attachments))
             .where(self.model.id == messageId)
         )
 
