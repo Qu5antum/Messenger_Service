@@ -19,8 +19,8 @@ async def get_message_attachment_service(session: AsyncSession = Depends(get_ses
 @message_attachment_route.get("/chat/{chat_id}/attachment/{attachment_id}", status_code=200)
 async def get_attachment(
     chat_id: UUID, 
-    attachemt_id: UUID, 
+    attachment_id: UUID, 
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     message_attachment_service: MessageAttachmentService = Depends(get_message_attachment_service)
 ):
-    return await message_attachment_service.get_attachments(chat_id=chat_id, attachment_id=attachemt_id, current_user_id=user.id)
+    return await message_attachment_service.get_attachments(chat_id=chat_id, attachment_id=attachment_id, current_user_id=user.id)

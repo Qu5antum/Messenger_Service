@@ -1,7 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import {
+    useEffect,
+    useRef,
+    useState
+} from 'react'
 
-import { buildWsUrl } from '../api/client'
+import {
+    useNavigate,
+    useParams
+} from 'react-router-dom'
+
+import {
+    buildWsUrl
+} from '../api/client'
 
 import {
     getMessages,
@@ -34,11 +44,14 @@ type MessageAttachment = {
     duration?: number | null
 }
 
+
 type Message = {
     id: string
     chat_id: string
     sender_id: string
+
     text: string | null
+
     sent_at: string
     edited_at: string
 
@@ -51,6 +64,7 @@ type Message = {
     attachments: MessageAttachment[]
 }
 
+
 type Chat = {
     id: string
     title?: string
@@ -58,11 +72,13 @@ type Chat = {
     owner_id?: string | null
 }
 
+
 type ParticipantUser = {
     id: string
     username?: string
     phone_number?: string | null
 }
+
 
 type Participant = {
     id: string
@@ -80,9 +96,11 @@ type Participant = {
 
 export default function Chat() {
 
-    const { chatId = '' } = useParams()
+    const { chatId = '' } =
+        useParams()
 
-    const navigate = useNavigate()
+    const navigate =
+        useNavigate()
 
 
     // =========================================
@@ -94,6 +112,13 @@ export default function Chat() {
 
     const [text, setText] =
         useState('')
+
+    const [selectedFile, setSelectedFile] =
+        useState<File | null>(null)
+
+    const [selectedFilePreview, setSelectedFilePreview] =
+        useState<string | null>(null)
+
 
     const [chat, setChat] =
         useState<Chat | null>(null)
@@ -107,8 +132,22 @@ export default function Chat() {
     const [loading, setLoading] =
         useState(false)
 
+    const [sending, setSending] =
+        useState(false)
+
     const [error, setError] =
         useState<string | null>(null)
+
+
+    // =========================================
+    // Recording
+    // =========================================
+
+    const [isRecording, setIsRecording] =
+        useState(false)
+
+    const [recordingTime, setRecordingTime] =
+        useState(0)
 
 
     // =========================================
@@ -159,6 +198,27 @@ export default function Chat() {
 
     const messagesEndRef =
         useRef<HTMLDivElement | null>(null)
+
+    const imageInputRef =
+        useRef<HTMLInputElement | null>(null)
+
+    const videoInputRef =
+        useRef<HTMLInputElement | null>(null)
+
+    const audioInputRef =
+        useRef<HTMLInputElement | null>(null)
+
+    const fileInputRef =
+        useRef<HTMLInputElement | null>(null)
+
+    const mediaRecorderRef =
+        useRef<MediaRecorder | null>(null)
+
+    const audioChunksRef =
+        useRef<Blob[]>([])
+
+    const recordingIntervalRef =
+        useRef<number | null>(null)
 
 
     // =========================================
@@ -230,20 +290,11 @@ export default function Chat() {
 
                 setLoading(true)
 
-
-                // -----------------------------
-                // Chat
-                // -----------------------------
-
                 const chatInfo =
                     await getChat(chatId)
 
                 setChat(chatInfo)
 
-
-                // -----------------------------
-                // Messages
-                // -----------------------------
 
                 const msgs =
                     await getMessages(chatId)
@@ -251,16 +302,10 @@ export default function Chat() {
                 setMessages(msgs)
 
 
-                // -----------------------------
-                // Participants
-                // -----------------------------
-
                 if (chatInfo.is_group) {
 
                     const parts =
-                        await getParticipants(
-                            chatId
-                        )
+                        await getParticipants(chatId)
 
                     setParticipants(parts)
 
@@ -274,7 +319,7 @@ export default function Chat() {
 
                     scrollToBottom(false)
 
-                }, 50)
+                }, 100)
 
             } catch (err: any) {
 
@@ -339,17 +384,32 @@ export default function Chat() {
 
                 if (
                     payload.type ===
-                        'message_created' &&
-                    payload.chat_id ===
-                        chatId
+                    'message_created' &&
+                    payload.chat_id === chatId
                 ) {
 
-                    setMessages((prev) => [
-                        ...prev,
-                        payload.data,
-                    ])
+                    setMessages((prev) => {
 
-                    scrollToBottom()
+                        const exists =
+                            prev.some(
+                                (message) =>
+                                    message.id ===
+                                    payload.data.id
+                            )
+
+                        if (exists) {
+                            return prev
+                        }
+
+                        return [
+                            ...prev,
+                            payload.data,
+                        ]
+                    })
+
+                    setTimeout(() => {
+                        scrollToBottom()
+                    }, 50)
                 }
 
             } catch (e) {
@@ -382,6 +442,330 @@ export default function Chat() {
 
 
     // =========================================
+    // Select file
+    // =========================================
+
+    const handleSelectFile = (
+        file: File | null
+    ) => {
+
+        if (!file) {
+            return
+        }
+
+
+        if (
+            selectedFilePreview
+        ) {
+
+            URL.revokeObjectURL(
+                selectedFilePreview
+            )
+        }
+
+
+        setSelectedFile(file)
+
+
+        if (
+            file.type.startsWith('image/') ||
+            file.type.startsWith('video/') ||
+            file.type.startsWith('audio/')
+        ) {
+
+            const previewUrl =
+                URL.createObjectURL(file)
+
+            setSelectedFilePreview(
+                previewUrl
+            )
+
+        } else {
+
+            setSelectedFilePreview(null)
+        }
+    }
+
+
+    // =========================================
+    // Remove selected file
+    // =========================================
+
+    const handleRemoveSelectedFile = () => {
+
+        if (
+            selectedFilePreview
+        ) {
+
+            URL.revokeObjectURL(
+                selectedFilePreview
+            )
+        }
+
+        setSelectedFile(null)
+
+        setSelectedFilePreview(null)
+
+
+        if (imageInputRef.current) {
+            imageInputRef.current.value = ''
+        }
+
+        if (videoInputRef.current) {
+            videoInputRef.current.value = ''
+        }
+
+        if (audioInputRef.current) {
+            audioInputRef.current.value = ''
+        }
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
+    }
+
+
+    // =========================================
+    // Image select
+    // =========================================
+
+    const handleImageChange = (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+
+        const file =
+            e.target.files?.[0] || null
+
+        handleSelectFile(file)
+    }
+
+
+    // =========================================
+    // Video select
+    // =========================================
+
+    const handleVideoChange = (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+
+        const file =
+            e.target.files?.[0] || null
+
+        handleSelectFile(file)
+    }
+
+
+    // =========================================
+    // Audio select
+    // =========================================
+
+    const handleAudioChange = (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+
+        const file =
+            e.target.files?.[0] || null
+
+        handleSelectFile(file)
+    }
+
+
+    // =========================================
+    // Other file select
+    // =========================================
+
+    const handleFileChange = (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+
+        const file =
+            e.target.files?.[0] || null
+
+        handleSelectFile(file)
+    }
+
+
+    // =========================================
+    // Start voice recording
+    // =========================================
+
+    const startRecording = async () => {
+
+        try {
+
+            setError(null)
+
+            const stream =
+                await navigator.mediaDevices.getUserMedia({
+                    audio: true
+                })
+
+
+            const mediaRecorder =
+                new MediaRecorder(stream)
+
+            mediaRecorderRef.current =
+                mediaRecorder
+
+            audioChunksRef.current = []
+
+
+            mediaRecorder.ondataavailable =
+                (event) => {
+
+                    if (
+                        event.data.size > 0
+                    ) {
+
+                        audioChunksRef.current.push(
+                            event.data
+                        )
+                    }
+                }
+
+
+            mediaRecorder.onstop = () => {
+
+                const audioBlob =
+                    new Blob(
+                        audioChunksRef.current,
+                        {
+                            type:
+                                mediaRecorder.mimeType ||
+                                'audio/webm'
+                        }
+                    )
+
+
+                const extension =
+                    audioBlob.type.includes(
+                        'ogg'
+                    )
+                        ? 'ogg'
+                        : 'webm'
+
+
+                const audioFile =
+                    new File(
+                        [audioBlob],
+                        `voice-${Date.now()}.${extension}`,
+                        {
+                            type:
+                                audioBlob.type
+                        }
+                    )
+
+
+                handleSelectFile(
+                    audioFile
+                )
+
+
+                stream
+                    .getTracks()
+                    .forEach(
+                        (track) =>
+                            track.stop()
+                    )
+            }
+
+
+            mediaRecorder.start()
+
+            setIsRecording(true)
+
+            setRecordingTime(0)
+
+
+            recordingIntervalRef.current =
+                window.setInterval(() => {
+
+                    setRecordingTime(
+                        (prev) => prev + 1
+                    )
+
+                }, 1000)
+
+        } catch (e) {
+
+            console.error(
+                'Recording error:',
+                e
+            )
+
+            setError(
+                'Не удалось получить доступ к микрофону'
+            )
+        }
+    }
+
+
+    // =========================================
+    // Stop voice recording
+    // =========================================
+
+    const stopRecording = () => {
+
+        const recorder =
+            mediaRecorderRef.current
+
+        if (
+            recorder &&
+            recorder.state !== 'inactive'
+        ) {
+
+            recorder.stop()
+        }
+
+
+        if (
+            recordingIntervalRef.current
+        ) {
+
+            clearInterval(
+                recordingIntervalRef.current
+            )
+
+            recordingIntervalRef.current =
+                null
+        }
+
+        setIsRecording(false)
+    }
+
+
+    // =========================================
+    // Cleanup recording
+    // =========================================
+
+    useEffect(() => {
+
+        return () => {
+
+            if (
+                recordingIntervalRef.current
+            ) {
+
+                clearInterval(
+                    recordingIntervalRef.current
+                )
+            }
+
+
+            if (
+                selectedFilePreview
+            ) {
+
+                URL.revokeObjectURL(
+                    selectedFilePreview
+                )
+            }
+        }
+
+    }, [selectedFilePreview])
+
+
+    // =========================================
     // Send message
     // =========================================
 
@@ -389,62 +773,68 @@ export default function Chat() {
 
         if (
             !chatId ||
-            !text.trim()
-        ) {
-            return
-        }
-
-        setError(null)
-
-        const textToSend =
-            text.trim()
-
-        setText('')
-
-        const ws =
-            wsRef.current
-
-
-        const payload = {
-
-            type: 'send_message',
-
-            chat_id: chatId,
-
-            payload: {
-                text: textToSend,
-            },
-        }
-
-
-        if (
-            ws &&
-            ws.readyState ===
-                WebSocket.OPEN
-        ) {
-
-            ws.send(
-                JSON.stringify(payload)
+            (
+                !text.trim() &&
+                !selectedFile
             )
-
+        ) {
             return
         }
 
 
         try {
 
+            setSending(true)
+
+            setError(null)
+
+
+            const textToSend =
+                text.trim()
+
+
+            const fileToSend =
+                selectedFile
+
+
             const data =
                 await sendMessage(
                     chatId,
-                    textToSend
+                    textToSend,
+                    fileToSend
                 )
 
-            setMessages((prev) => [
-                ...prev,
-                data,
-            ])
 
-            scrollToBottom()
+            setMessages((prev) => {
+
+                const exists =
+                    prev.some(
+                        (message) =>
+                            message.id ===
+                            data.id
+                    )
+
+                if (exists) {
+                    return prev
+                }
+
+                return [
+                    ...prev,
+                    data
+                ]
+            })
+
+
+            setText('')
+
+            handleRemoveSelectedFile()
+
+
+            setTimeout(() => {
+
+                scrollToBottom()
+
+            }, 50)
 
         } catch (e: any) {
 
@@ -457,6 +847,10 @@ export default function Chat() {
                     e
                 )
             )
+
+        } finally {
+
+            setSending(false)
         }
     }
 
@@ -482,12 +876,23 @@ export default function Chat() {
 
 
     // =========================================
-    // Start message edit
+    // Start edit
     // =========================================
 
     const handleStartEdit = (
         message: Message
     ) => {
+
+        if (
+            message.attachments.length > 0
+        ) {
+
+            setError(
+                'Редактирование сообщений с файлами пока недоступно'
+            )
+
+            return
+        }
 
         setEditingMessageId(
             message.id
@@ -502,7 +907,7 @@ export default function Chat() {
 
 
     // =========================================
-    // Cancel message edit
+    // Cancel edit
     // =========================================
 
     const handleCancelEdit = () => {
@@ -514,7 +919,7 @@ export default function Chat() {
 
 
     // =========================================
-    // Save message edit
+    // Save edit
     // =========================================
 
     const handleSaveEdit = async () => {
@@ -535,6 +940,7 @@ export default function Chat() {
             return
         }
 
+
         try {
 
             setEditingLoading(true)
@@ -550,21 +956,23 @@ export default function Chat() {
 
 
             setMessages((prev) =>
-                prev.map((message) =>
-                    message.id ===
-                    editingMessageId
-                        ? updatedMessage
-                        : message
+                prev.map(
+                    (message) =>
+                        message.id ===
+                        editingMessageId
+                            ? updatedMessage
+                            : message
                 )
             )
 
 
             setSearchResults((prev) =>
-                prev.map((message) =>
-                    message.id ===
-                    editingMessageId
-                        ? updatedMessage
-                        : message
+                prev.map(
+                    (message) =>
+                        message.id ===
+                        editingMessageId
+                            ? updatedMessage
+                            : message
                 )
             )
 
@@ -606,6 +1014,7 @@ export default function Chat() {
         if (!confirmed) {
             return
         }
+
 
         try {
 
@@ -687,6 +1096,7 @@ export default function Chat() {
             return
         }
 
+
         try {
 
             setSearchLoading(true)
@@ -736,14 +1146,19 @@ export default function Chat() {
         e: React.KeyboardEvent<HTMLInputElement>
     ) => {
 
-        if (e.key === 'Enter') {
+        if (
+            e.key === 'Enter'
+        ) {
 
             e.preventDefault()
 
             handleSearch()
         }
 
-        if (e.key === 'Escape') {
+
+        if (
+            e.key === 'Escape'
+        ) {
 
             setSearchText('')
 
@@ -789,11 +1204,12 @@ export default function Chat() {
             return
         }
 
-        setError(null)
 
         try {
 
             setLoading(true)
+
+            setError(null)
 
 
             await addParticipant(
@@ -868,8 +1284,7 @@ export default function Chat() {
 
 
         if (
-            userId ===
-            currentUserId
+            userId === currentUserId
         ) {
 
             setError(
@@ -939,7 +1354,7 @@ export default function Chat() {
 
 
     // =========================================
-    // Leave group
+    // Leave chat
     // =========================================
 
     const handleLeaveChat = async () => {
@@ -971,7 +1386,9 @@ export default function Chat() {
             )
 
 
-            if (wsRef.current) {
+            if (
+                wsRef.current
+            ) {
 
                 wsRef.current.close()
 
@@ -1014,10 +1431,7 @@ export default function Chat() {
             )
 
 
-        // -----------------------------
         // Image
-        // -----------------------------
-
         if (
             attachment.mime_type.startsWith(
                 'image/'
@@ -1025,6 +1439,7 @@ export default function Chat() {
         ) {
 
             return (
+
                 <div
                     key={attachment.id}
                     className="message-attachment image-attachment"
@@ -1055,10 +1470,7 @@ export default function Chat() {
         }
 
 
-        // -----------------------------
         // Video
-        // -----------------------------
-
         if (
             attachment.mime_type.startsWith(
                 'video/'
@@ -1066,6 +1478,7 @@ export default function Chat() {
         ) {
 
             return (
+
                 <div
                     key={attachment.id}
                     className="message-attachment video-attachment"
@@ -1087,10 +1500,7 @@ export default function Chat() {
         }
 
 
-        // -----------------------------
-        // Audio / Voice
-        // -----------------------------
-
+        // Audio
         if (
             attachment.mime_type.startsWith(
                 'audio/'
@@ -1098,6 +1508,7 @@ export default function Chat() {
         ) {
 
             return (
+
                 <div
                     key={attachment.id}
                     className="message-attachment audio-attachment"
@@ -1107,6 +1518,7 @@ export default function Chat() {
                         src={url}
                         controls
                         preload="metadata"
+                        className="chat-audio"
                     />
 
                     <div className="attachment-name">
@@ -1118,11 +1530,9 @@ export default function Chat() {
         }
 
 
-        // -----------------------------
-        // Other file
-        // -----------------------------
-
+        // Other files
         return (
+
             <div
                 key={attachment.id}
                 className="message-attachment file-attachment"
@@ -1137,12 +1547,85 @@ export default function Chat() {
                     rel="noopener noreferrer"
                 >
 
-                    Скачать файл
+                    📄 Скачать файл
+
                 </a>
 
                 <div className="attachment-name">
                     {attachment.file_name}
                 </div>
+
+            </div>
+        )
+    }
+
+
+    // =========================================
+    // Render selected file preview
+    // =========================================
+
+    const renderSelectedFile = () => {
+
+        if (!selectedFile) {
+            return null
+        }
+
+
+        return (
+
+            <div className="selected-file-preview">
+
+                <div className="selected-file-header">
+
+                    <span>
+                        {selectedFile.name}
+                    </span>
+
+                    <button
+                        type="button"
+                        onClick={
+                            handleRemoveSelectedFile
+                        }
+                    >
+                        ✕
+                    </button>
+
+                </div>
+
+
+                {selectedFile.type.startsWith(
+                    'image/'
+                ) && selectedFilePreview && (
+
+                    <img
+                        src={selectedFilePreview}
+                        alt={selectedFile.name}
+                        className="selected-image-preview"
+                    />
+                )}
+
+
+                {selectedFile.type.startsWith(
+                    'video/'
+                ) && selectedFilePreview && (
+
+                    <video
+                        src={selectedFilePreview}
+                        controls
+                        className="selected-video-preview"
+                    />
+                )}
+
+
+                {selectedFile.type.startsWith(
+                    'audio/'
+                ) && selectedFilePreview && (
+
+                    <audio
+                        src={selectedFilePreview}
+                        controls
+                    />
+                )}
 
             </div>
         )
@@ -1166,8 +1649,8 @@ export default function Chat() {
             isMine
                 ? currentUsername || 'Вы'
                 : message.sender?.username ||
-                  message.sender?.phone_number ||
-                  message.sender_id
+                message.sender?.phone_number ||
+                message.sender_id
 
 
         const isEditing =
@@ -1181,6 +1664,7 @@ export default function Chat() {
 
 
         return (
+
             <div
                 key={message.id}
                 className={`message-item ${
@@ -1200,9 +1684,7 @@ export default function Chat() {
                     <div className="message-edit">
 
                         <input
-                            value={
-                                editingText
-                            }
+                            value={editingText}
                             onChange={(e) =>
                                 setEditingText(
                                     e.target.value
@@ -1211,16 +1693,15 @@ export default function Chat() {
                             onKeyDown={(e) => {
 
                                 if (
-                                    e.key ===
-                                    'Enter'
+                                    e.key === 'Enter'
                                 ) {
 
                                     handleSaveEdit()
                                 }
 
+
                                 if (
-                                    e.key ===
-                                    'Escape'
+                                    e.key === 'Escape'
                                 ) {
 
                                     handleCancelEdit()
@@ -1242,9 +1723,11 @@ export default function Chat() {
                                     editingLoading
                                 }
                             >
+
                                 {editingLoading
                                     ? 'Сохранение...'
                                     : 'Сохранить'}
+
                             </button>
 
 
@@ -1268,23 +1751,17 @@ export default function Chat() {
 
                     <>
 
-                        {/* ----------------------------- */}
-                        {/* Text */}
-                        {/* ----------------------------- */}
-
                         {message.text && (
+
                             <div className="message-bubble">
+
                                 {message.text}
+
                             </div>
                         )}
 
 
-                        {/* ----------------------------- */}
-                        {/* Attachments */}
-                        {/* ----------------------------- */}
-
-                        {message.attachments &&
-                            message.attachments.length > 0 && (
+                        {message.attachments?.length > 0 && (
 
                             <div className="message-attachments">
 
@@ -1296,10 +1773,6 @@ export default function Chat() {
                         )}
 
 
-                        {/* ----------------------------- */}
-                        {/* Message actions */}
-                        {/* ----------------------------- */}
-
                         {isMine && (
 
                             <div className="message-actions">
@@ -1310,6 +1783,9 @@ export default function Chat() {
                                         handleStartEdit(
                                             message
                                         )
+                                    }
+                                    disabled={
+                                        message.attachments.length > 0
                                     }
                                 >
                                     Изменить
@@ -1327,9 +1803,11 @@ export default function Chat() {
                                         isDeleting
                                     }
                                 >
+
                                     {isDeleting
                                         ? 'Удаление...'
                                         : 'Удалить'}
+
                                 </button>
 
                             </div>
@@ -1351,7 +1829,6 @@ export default function Chat() {
 
         <div className="chat-page">
 
-
             {/* ================================= */}
             {/* Header */}
             {/* ================================= */}
@@ -1361,8 +1838,7 @@ export default function Chat() {
                 <div>
 
                     <h2>
-                        {chat?.title ||
-                            'Чат'}
+                        {chat?.title || 'Чат'}
                     </h2>
 
 
@@ -1372,8 +1848,7 @@ export default function Chat() {
 
                             {participants.length}{' '}
 
-                            {participants.length ===
-                            1
+                            {participants.length === 1
                                 ? 'участник'
                                 : 'участников'}
 
@@ -1389,9 +1864,7 @@ export default function Chat() {
 
                     <input
                         placeholder="Поиск сообщений..."
-                        value={
-                            searchText
-                        }
+                        value={searchText}
                         onChange={(e) =>
                             setSearchText(
                                 e.target.value
@@ -1413,9 +1886,11 @@ export default function Chat() {
                             !searchText.trim()
                         }
                     >
+
                         {searchLoading
                             ? 'Поиск...'
                             : 'Найти'}
+
                     </button>
 
 
@@ -1429,7 +1904,6 @@ export default function Chat() {
                         >
                             Очистить
                         </button>
-
                     )}
 
                 </div>
@@ -1452,16 +1926,13 @@ export default function Chat() {
                         </h3>
 
                         <span>
-                            {
-                                searchResults.length
-                            }
+                            {searchResults.length}
                         </span>
 
                     </div>
 
 
-                    {searchResults.length ===
-                    0 ? (
+                    {searchResults.length === 0 ? (
 
                         <div className="empty-state">
                             Ничего не найдено
@@ -1488,7 +1959,6 @@ export default function Chat() {
 
             <div className="chat-grid">
 
-
                 {/* ================================= */}
                 {/* Chat */}
                 {/* ================================= */}
@@ -1498,19 +1968,19 @@ export default function Chat() {
                     <div className="message-list">
 
                         {loading &&
-                        messages.length ===
-                            0 ? (
+                        messages.length === 0 ? (
 
                             <div className="empty-state">
                                 Загрузка сообщений…
                             </div>
 
-                        ) : messages.length ===
-                          0 ? (
+                        ) : messages.length === 0 ? (
 
                             <div className="empty-state">
+
                                 Нет сообщений.
                                 Напишите первым!
+
                             </div>
 
                         ) : (
@@ -1530,9 +2000,152 @@ export default function Chat() {
                     </div>
 
 
+                    {/* ================================= */}
+                    {/* Selected file preview */}
+                    {/* ================================= */}
+
+                    {renderSelectedFile()}
+
+
+                    {/* ================================= */}
+                    {/* Hidden inputs */}
+                    {/* ================================= */}
+
+                    <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={
+                            handleImageChange
+                        }
+                    />
+
+
+                    <input
+                        ref={videoInputRef}
+                        type="file"
+                        accept="video/*"
+                        hidden
+                        onChange={
+                            handleVideoChange
+                        }
+                    />
+
+
+                    <input
+                        ref={audioInputRef}
+                        type="file"
+                        accept="audio/*"
+                        hidden
+                        onChange={
+                            handleAudioChange
+                        }
+                    />
+
+
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        hidden
+                        onChange={
+                            handleFileChange
+                        }
+                    />
+
+
+                    {/* ================================= */}
                     {/* Input */}
+                    {/* ================================= */}
 
                     <div className="chat-input-row">
+
+                        {/* Image */}
+
+                        <button
+                            type="button"
+                            title="Добавить фото"
+                            onClick={() =>
+                                imageInputRef.current?.click()
+                            }
+                            disabled={sending}
+                        >
+                            📷
+                        </button>
+
+
+                        {/* Video */}
+
+                        <button
+                            type="button"
+                            title="Добавить видео"
+                            onClick={() =>
+                                videoInputRef.current?.click()
+                            }
+                            disabled={sending}
+                        >
+                            🎥
+                        </button>
+
+
+                        {/* Audio file */}
+
+                        <button
+                            type="button"
+                            title="Добавить аудио"
+                            onClick={() =>
+                                audioInputRef.current?.click()
+                            }
+                            disabled={sending}
+                        >
+                            🎵
+                        </button>
+
+
+                        {/* Voice recording */}
+
+                        {!isRecording ? (
+
+                            <button
+                                type="button"
+                                title="Записать голосовое сообщение"
+                                onClick={
+                                    startRecording
+                                }
+                                disabled={sending}
+                            >
+                                🎙️
+                            </button>
+
+                        ) : (
+
+                            <button
+                                type="button"
+                                title="Остановить запись"
+                                onClick={
+                                    stopRecording
+                                }
+                            >
+                                ⏹️ {recordingTime} сек
+                            </button>
+                        )}
+
+
+                        {/* File */}
+
+                        <button
+                            type="button"
+                            title="Добавить файл"
+                            onClick={() =>
+                                fileInputRef.current?.click()
+                            }
+                            disabled={sending}
+                        >
+                            📎
+                        </button>
+
+
+                        {/* Text */}
 
                         <input
                             placeholder="Напишите сообщение..."
@@ -1545,9 +2158,14 @@ export default function Chat() {
                             onKeyDown={
                                 handleKeyDown
                             }
-                            disabled={!chatId}
+                            disabled={
+                                !chatId ||
+                                sending
+                            }
                         />
 
+
+                        {/* Send */}
 
                         <button
                             type="button"
@@ -1556,10 +2174,18 @@ export default function Chat() {
                             }
                             disabled={
                                 !chatId ||
-                                !text.trim()
+                                sending ||
+                                (
+                                    !text.trim() &&
+                                    !selectedFile
+                                )
                             }
                         >
-                            Отправить
+
+                            {sending
+                                ? 'Отправка...'
+                                : 'Отправить'}
+
                         </button>
 
                     </div>
@@ -1583,7 +2209,6 @@ export default function Chat() {
 
                     <aside className="chat-sidebar">
 
-
                         {/* Participants */}
 
                         <div className="sidebar-section">
@@ -1604,9 +2229,9 @@ export default function Chat() {
 
                                         const isCurrent =
                                             participantUserId ===
-                                                currentUserId ||
+                                            currentUserId ||
                                             participant.user_id ===
-                                                currentUserId
+                                            currentUserId
 
 
                                         const name =
@@ -1629,10 +2254,12 @@ export default function Chat() {
                                             >
 
                                                 <span>
+
                                                     {name}
 
                                                     {isCurrent &&
                                                         ' (вы)'}
+
                                                 </span>
 
 
@@ -1724,9 +2351,11 @@ export default function Chat() {
                                 }
                                 className="leave-chat-button"
                             >
+
                                 {loading
                                     ? 'Обработка...'
                                     : 'Покинуть группу'}
+
                             </button>
 
                         </div>
