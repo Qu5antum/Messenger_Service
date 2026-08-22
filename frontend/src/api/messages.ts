@@ -7,7 +7,7 @@ export const getMessages = (chatId: string) =>
 export const sendMessage = (
     chatId: string,
     text?: string,
-    file?: File | Blob | null
+    file?: File | null
 ) => {
     const formData = new FormData()
 

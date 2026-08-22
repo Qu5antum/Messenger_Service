@@ -9,6 +9,4 @@ export const login = (username: string, password: string) => {
     return api.post('/api/user/login', params).then(r => r.data)
 }
 
-export const dummyLogin = (role: string) => api.post('/api/user/dummyLogin', { role }).then(r => r.data)
-
 export const refresh = (token: string) => api.post('/api/user/refresh', { token }).then(r => r.data)

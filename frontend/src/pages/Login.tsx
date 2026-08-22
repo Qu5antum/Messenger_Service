@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../AuthContext'
 
 export default function Login() {
-    const { login, dummyLogin } = useAuth()
+    const { login } = useAuth()
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [msg, setMsg] = useState<string | null>(null)
@@ -20,16 +20,6 @@ export default function Login() {
             await login(username, password)
         } catch (err: any) {
             setMsg(err?.response?.data?.detail || String(err))
-        } finally { setLoading(false) }
-    }
-
-    const onDummy = async (role: string) => {
-        setMsg(null)
-        try {
-            setLoading(true)
-            await dummyLogin(role)
-        } catch (err: any) {
-            setMsg(String(err))
         } finally { setLoading(false) }
     }
 
@@ -52,15 +42,6 @@ export default function Login() {
                 {loading ? 'Вход...' : 'Войти'}
                 </button>
             </form>
-
-            <div className="dummy-buttons">
-                <button onClick={() => onDummy('user')} disabled={loading}>
-                Тест (User)
-                </button>
-                <button onClick={() => onDummy('admin')} disabled={loading}>
-                Тест (Admin)
-                </button>
-            </div>
 
             {msg && <p className="error-msg">{msg}</p>}
             </div>

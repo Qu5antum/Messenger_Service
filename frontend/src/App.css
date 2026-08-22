@@ -542,3 +542,122 @@ button:disabled {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
 }
+
+.chat-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.message-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.send-button {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.selected-file {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    width: 100%;
+    max-width: 100%;
+
+    padding: 8px 12px;
+
+    box-sizing: border-box;
+}
+
+.selected-file-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    min-width: 0;
+    overflow: hidden;
+}
+
+.selected-file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.selected-file-size {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.chat-image {
+    display: block;
+
+    max-width: 400px;
+    max-height: 400px;
+
+    width: 100%;
+    height: auto;
+
+    object-fit: contain;
+}
+
+.chat-video {
+    display: block;
+
+    width: 100%;
+    max-width: 500px;
+
+    max-height: 400px;
+}
+
+.chat-audio {
+    width: 100%;
+    max-width: 400px;
+}
+
+.message-attachment {
+    margin-top: 8px;
+    max-width: 100%;
+}
+
+.attachment-name {
+    margin-top: 4px;
+    font-size: 13px;
+    word-break: break-word;
+}
+
+.recording-panel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 8px;
+}
+
+@media (max-width: 768px) {
+    .chat-input-row {
+        flex-wrap: wrap;
+    }
+
+    .message-input {
+        order: -1;
+        width: 100%;
+        flex-basis: 100%;
+    }
+
+    .send-button {
+        margin-left: auto;
+    }
+
+    .chat-image,
+    .chat-video,
+    .chat-audio {
+        max-width: 100%;
+    }
+}

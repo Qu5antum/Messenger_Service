@@ -49,7 +49,11 @@ class MessageAttachmentService:
         return FileResponse(
             path=file_path,
             media_type=attachment.mime_type,
-            filename=attachment.file_name
+            headers={
+                "Content-Disposition": (
+                    f'inline; filename="{attachment.file_name}"'
+                )
+            }
         )
 
 

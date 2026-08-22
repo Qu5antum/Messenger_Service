@@ -9,7 +9,6 @@ type AuthContextType = {
     login: (username: string, password: string) => Promise<void>
     logout: () => void
     register: (data: any) => Promise<any>
-    dummyLogin: (role: string) => Promise<any>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -66,20 +65,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const register = (data: any) => authApi.register(data)
-    const dummyLogin = async (role: string) => {
-        const res = await authApi.dummyLogin(role)
-        if (res?.access_token) {
-            setToken(res.access_token)
-            setUsername(null)
-            const payload = decodeJwt(res.access_token)
-            setUserId(payload?.sub ?? null)
-            navigate('/')
-        }
-        return res
-    }
+    
 
     return (
-        <AuthContext.Provider value={{ token, userId, username, login, logout, register, dummyLogin }}>
+        <AuthContext.Provider value={{ token, userId, username, login, logout, register }}>
             {children}
         </AuthContext.Provider>
     )
