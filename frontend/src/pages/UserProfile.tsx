@@ -4,6 +4,10 @@ import {
 } from 'react'
 
 import {
+    useNavigate,
+} from 'react-router-dom'
+
+import {
     getUserProfile,
     getUserAvatar,
     updateProfile,
@@ -19,6 +23,8 @@ type UserProfile = {
 
 
 export default function UserProfile() {
+    const navigate = useNavigate()
+
     const [profile, setProfile] =
         useState<UserProfile | null>(null)
 
@@ -322,14 +328,23 @@ export default function UserProfile() {
             <div className="profile-card">
 
                 <div className="profile-header">
+                    <button
+                        type="button"
+                        className="profile-back-button"
+                        onClick={() => navigate('/')}
+                    >
+                        ← Назад
+                    </button>
 
-                    <h2>
-                        Мой профиль
-                    </h2>
+                    <div className="profile-header-content">
+                        <h2>
+                            Мой профиль
+                        </h2>
 
-                    <p>
-                        Управление информацией профиля
-                    </p>
+                        <p>
+                            Управление информацией профиля
+                        </p>
+                    </div>
 
                 </div>
 
