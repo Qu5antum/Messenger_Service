@@ -25,17 +25,7 @@ async def get_user_by_phone_number(
 ):
     return await userService.get_user_by_phone_number(phone_number=phone_number)
 
-
-@user_route.get("/user/{user_id}", response_model=UserOut, status_code=200)
-async def get_user_by_id(
-    user_id: UUID,
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
-    userService: UserService = Depends(get_user_service)
-):
-    return await userService.get_user_by_id(user_id=user_id)
-
-
-@user_route.get("/user/{user_id}/profile", response_model=UserOut, status_code=200)
+@user_route.get("/user/profile", response_model=UserOut, status_code=200)
 async def get_current_user_profile(
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     userService: UserService = Depends(get_user_service)
@@ -43,7 +33,7 @@ async def get_current_user_profile(
     return await userService.get_user_by_id(user_id=user.id)
 
 
-@user_route.put("/user/{user_id}/update/profile", status_code=200)
+@user_route.put("/user/update/profile", status_code=200)
 async def update_profile(
     username: str | None = Form(None),
     phone_number: str | None = Form(None),
@@ -64,9 +54,21 @@ async def update_profile(
         avatar_file=avatar_upload_file,
     )
 
-@user_route.get("/user/{user_id}/avatar", status_code=200)
+
+@user_route.get("/user/avatar", status_code=200)
 async def get_avatar_image(
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     userService: UserService = Depends(get_user_service)
 ):
-    return await userService.get_user_avatar_profile(current_user_id=user.id)
+    return await userService.get_user_avatar_profile(current_user_id=user.id) 
+
+
+@user_route.get("/user/{user_id}", response_model=UserOut, status_code=200)
+async def get_user_by_id(
+    user_id: UUID,
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
+    userService: UserService = Depends(get_user_service)
+):
+    return await userService.get_user_by_id(user_id=user_id)
+
+

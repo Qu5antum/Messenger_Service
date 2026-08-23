@@ -6,6 +6,7 @@ import Register from './pages/Register'
 import Chat from './pages/Chat'
 import ChatsList from './pages/ChatsList'
 import RequireAuth from './RequireAuth'
+import UserProfile from './pages/UserProfile'
 
 /* 1. Компонент двухколоночного каркаса (Sidebar + Контент чата) */
 function MainLayout() {
@@ -67,6 +68,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/profile" element={<UserProfile />}/>
 
             <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
               <Route index element={<EmptyChatWelcome />} />

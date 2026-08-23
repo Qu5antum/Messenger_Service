@@ -410,6 +410,20 @@ export default function ChatsList() {
                 height: '100%',
             }}
         >
+            <div className="sidebar-profile-button">
+                <Link
+                    to="/profile"
+                    className="profile-link"
+                >
+                    <span className="profile-icon">
+                        👤
+                    </span>
+
+                    <span>
+                        Мой профиль
+                    </span>
+                </Link>
+            </div>
 
             {/* ================================= */}
             {/* Поиск */}

@@ -756,3 +756,50 @@ button:disabled {
 .leave-chat-button:hover:not(:disabled) {
   background: #dc2626;
 }
+.sidebar-profile-button {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+    background: #ffffff;
+}
+
+.profile-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+
+    background: var(--accent-light);
+    color: var(--accent);
+
+    border-radius: var(--radius-md);
+
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+
+    transition:
+        background-color 0.15s ease,
+        transform 0.1s ease;
+}
+
+.profile-link:hover {
+    background: #cceeff;
+    transform: translateY(-1px);
+}
+
+.profile-icon {
+    width: 28px;
+    height: 28px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: var(--accent);
+    color: #ffffff;
+
+    font-size: 0.9rem;
+}
