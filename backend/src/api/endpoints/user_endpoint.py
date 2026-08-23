@@ -3,7 +3,7 @@ from uuid import UUID
 
 from src.database.db import AsyncSession, get_session
 from src.services.user_service import UserService
-from src.api.schemas.user_schema import UserOut
+from src.api.schemas.user_schema import UserOut, UserUpdate
 from src.database.models import User, UserRole
 from src.api.dependencies.require_role_dependency import require_roles
 
@@ -33,3 +33,20 @@ async def get_user_by_id(
     userService: UserService = Depends(get_user_service)
 ):
     return await userService.get_user_by_id(user_id=user_id)
+
+
+@user_route.get("/user/{user_id}/profile", response_model=UserOut, status_code=200)
+async def get_current_user_profile(
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
+    userService: UserService = Depends(get_user_service)
+):
+    return await userService.get_user_by_id(user_id=user.id)
+
+
+@user_route.put("/user/{user_id}/update/profile", status_code=200)
+async def update_profile(
+    user_update: UserUpdate,
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
+    userService: UserService = Depends(get_user_service)
+):
+    return await userService.update_profile(current_user_id=user.id, user_update=user_update)

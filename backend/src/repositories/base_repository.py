@@ -70,7 +70,7 @@ class BaseRepository(AbstractRepository):
 
             return obj
 
-        except Exception:
+        except:
             await self.session.rollback()
             raise
 

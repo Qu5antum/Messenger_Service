@@ -1,6 +1,7 @@
 from fastapi import Depends
 from sqlalchemy import select
 from uuid import UUID
+import logging
 
 from src.database.db import AsyncSession, get_session
 from src.database.models import User
@@ -9,6 +10,8 @@ from src.auth.jwt_handler import JWTHandler
 from src.auth.jwt_bearer import CurrentUser
 from src.exception_handlers.user_exceptions import UnauthorizedException
 from src.exception_handlers.user_exceptions import UserNotFoundException
+
+logger = logging.getLogger("dependency")
 
 jwt_handler = JWTHandler()
 
@@ -19,7 +22,12 @@ async def get_current_user(
     try:
         user_id = UUID(token.sub)
     except ValueError:
-        raise UnauthorizedException("Invalid user.")
+        logger.error(
+            "Invalid user",
+            extra={"user_id": str(user_id)}
+        )
+        
+        raise UnauthorizedException("Invalid user")
 
     result = await session.execute(
         select(User).where(User.id == user_id)
@@ -28,6 +36,12 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     
     if not user:
-        raise UserNotFoundException("User not found.")
-    
+        logger.warning(
+            "User not found by id",
+            extra={"user_id": str(user_id)}
+        )
+        raise UserNotFoundException("User not found")
+
+    logger.info("Successfule response of user")
+
     return user

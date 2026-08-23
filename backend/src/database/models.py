@@ -48,12 +48,16 @@ class User(Base):
         index=True
     )
 
+    description: Mapped[str] = mapped_column(nullable=True)
+
     phone_number: Mapped[str] = mapped_column(
         unique=True,
         nullable=False
     )
+
+    avatar_url: Mapped[str] = mapped_column(nullable=True)
+
     role: Mapped[UserRole] = mapped_column(default=UserRole.USER)
-    phone_number: Mapped[str] = mapped_column(nullable=False)
     password: Mapped[str] = mapped_column(nullable=False)
 
     participation_in_chats: Mapped[list['ChatParticipant']] = relationship(back_populates="user")

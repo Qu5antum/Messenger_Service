@@ -13,6 +13,8 @@ class DummyLoginRequest(BaseModel):
 class UserBase(BaseModel):
     username: str
     phone_number: str
+    description: str | None = None
+    avatar_url: str | None = None
 
 class UserCreate(UserBase):
     password: SecretStr
@@ -23,6 +25,15 @@ class UserCreate(UserBase):
 class UserOut(UserBase):
     id: UUID
     created_at: datetime
+    updated_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
 
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    phone_number: Optional[str] = None
+    description: Optional[str] = None
+    password: Optional[SecretStr] = None
+    confirm_password: Optional[SecretStr] = None
+    
