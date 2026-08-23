@@ -34,5 +34,4 @@ class UserUpdate(BaseModel):
     username: Optional[str] = None
     phone_number: Optional[str] = None
     description: Optional[str] = None
-    avatar_url: Optional[str] = None
     

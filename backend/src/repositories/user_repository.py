@@ -1,5 +1,5 @@
 from sqlalchemy import select
-from typing import Optional
+from typing import Optional, Dict, Any
 from uuid import UUID
 
 from .base_repository import BaseRepository
@@ -38,3 +38,24 @@ class UserRepository(BaseRepository):
 
         return result.scalar_one_or_none()
 
+    async def update_user_profile(self, current_user_id: UUID, data: Dict[str, Any], file_key: str | None = None):
+        user = await self.session.get(self.model, current_user_id)
+
+        try:
+            if user:
+                for key, value in data.items():
+                    if hasattr(user, key):
+                        setattr(user, key, value)
+
+                if file_key:
+                    user.avatar_url = file_key
+
+            await self.session.commit()
+            await self.session.refresh(user)
+
+            return user
+
+        except:
+            await self.session.rollback()
+
+            raise

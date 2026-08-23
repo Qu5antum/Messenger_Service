@@ -15,6 +15,7 @@ class Config(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     UPLOAD_DIR: Path = Path("uploads")
+    AVATAR_DIR: Path = Path("avatars")
 
     APP_NAME: str = "Chating_service"
     debug: bool = True

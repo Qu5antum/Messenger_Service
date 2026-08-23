@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, Form, File
 from uuid import UUID
 
 from src.database.db import AsyncSession, get_session
@@ -45,8 +45,21 @@ async def get_current_user_profile(
 
 @user_route.put("/user/{user_id}/update/profile", status_code=200)
 async def update_profile(
-    user_update: UserUpdate,
+    username: str | None = Form(None),
+    phone_number: str | None = Form(None),
+    description: str | None = Form(None),
+    avatar_upload_file: UploadFile | None = File(None),
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     userService: UserService = Depends(get_user_service)
 ):
-    return await userService.update_profile(current_user_id=user.id, user_update=user_update)
+    user_update = UserUpdate(
+        username=username,
+        phone_number=phone_number,
+        description=description,
+    )
+
+    return await userService.update_profile(
+        current_user_id=user.id,
+        user_update=user_update,
+        avatar_file=avatar_upload_file,
+    )
