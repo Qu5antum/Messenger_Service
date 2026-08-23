@@ -58,7 +58,10 @@ class UserService:
             return UserNotFoundException("User not found")
 
         try:
-            data = user_update.model_dump(exclude_unset=True)
+            data = user_update.model_dump(
+                exclude_unset=True,
+                exclude_none=True
+            )
 
             await self.user_repo.update(id=current_user_id, data=data)
 
