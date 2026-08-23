@@ -47,6 +47,8 @@ class UserService:
         return user
 
     async def update_profile(self, current_user_id: UUID, user_update: UserUpdate, avatar_file: UploadFile | None = None) -> dict[str, str]:
+        user = await self.helper.get_user_obj_or_404(user_id=current_user_id)
+
         file_key: str | None = None
 
         try:
@@ -54,6 +56,9 @@ class UserService:
                 exclude_unset=True,
                 exclude_none=True,
             )
+
+            if user.avatar_url and avatar_file:
+                await self.file_service.delete_file(file_key=user.avatar_url)
 
             if avatar_file:
                 file_key = (
