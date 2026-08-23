@@ -3,10 +3,11 @@ import logging
 from typing import Optional
 
 from src.database.db import AsyncSession
-from src.database.models import Chat, ChatParticipant, Message
+from src.database.models import Chat, ChatParticipant, Message, User
 from src.exception_handlers.chat_exception import ChatNotFoundException, ChatNotBelongToUserException
 from src.exception_handlers.user_exceptions import UserNotParticipantInChatException
 from src.exception_handlers.message_exception import MessageNotFoundException
+from src.exception_handlers.user_exceptions import UserNotFoundException
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
 from src.repositories.message_repository import MessageRepository
@@ -83,3 +84,16 @@ class Helper:
 			raise MessageNotFoundException("Message not found")
 
 		return message
+
+	async def get_user_obj_or_404(self, user_id: UUID) -> Optional[User]:
+		user = await self.user_repo.get_obj(id=user_id)
+
+		if not user:
+			logger.warning(
+				"User not found",
+				extra={"user_id": str(user_id)}
+			)
+
+			raise UserNotFoundException("User not found")
+
+		return user

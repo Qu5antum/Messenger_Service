@@ -63,3 +63,10 @@ async def update_profile(
         user_update=user_update,
         avatar_file=avatar_upload_file,
     )
+
+@user_route.get("/user/{user_id}/avatar", status_code=200)
+async def get_avatar_image(
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
+    userService: UserService = Depends(get_user_service)
+):
+    return await userService.get_user_avatar_profile(current_user_id=user.id)

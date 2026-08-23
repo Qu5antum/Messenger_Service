@@ -4,10 +4,8 @@ from fastapi.responses import FileResponse
 
 from src.database.db import AsyncSession
 from .helper import Helper
-from src.core.config import settings
 from src.repositories.message_attachment_repository import MessageAttachmentRepository
 from src.exception_handlers.message_exception import MessageAttachmentNotFoundException
-from src.exception_handlers.file_exception import FileNotFoundException
 
 logger = logging.getLogger("attachment")
 
@@ -18,7 +16,7 @@ class MessageAttachmentService:
         self.helper = Helper(session=self.session)
         self.attachment_repo = MessageAttachmentRepository(session=self.session)
 
-    async def get_attachments(self, chat_id: UUID, attachment_id: UUID, current_user_id: UUID):
+    async def get_attachments(self, chat_id: UUID, attachment_id: UUID, current_user_id: UUID) -> FileResponse:
         await self.helper.get_chat_or_404(chatId=chat_id)
 
         await self.helper.get_participant_or_400(userId=current_user_id, chatId=chat_id)

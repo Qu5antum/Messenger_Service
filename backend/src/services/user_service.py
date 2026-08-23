@@ -2,6 +2,8 @@ import logging
 from uuid import UUID
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import UploadFile
+from fastapi.responses import FileResponse
+from pathlib import Path
 
 from src.database.db import AsyncSession
 from src.api.schemas.user_schema import UserOut, UserUpdate
@@ -9,6 +11,8 @@ from src.repositories.user_repository import UserRepository
 from src.exception_handlers.user_exceptions import UserNotFoundException
 from src.exception_handlers.db_exception import DatabaseException
 from src.services.file_service import FileService
+from .helper import Helper
+from src.exception_handlers.file_exception import FileNotFoundException
 
 logger = logging.getLogger("user")
 
@@ -18,6 +22,7 @@ class UserService:
         self.session = session
         self.user_repo = UserRepository(session=self.session)
         self.file_service = FileService()
+        self.helper = Helper(session=self.session)
 
     async def get_user_by_phone_number(self, phone_number: str) -> UserOut:
         user = await self.user_repo.get_user_by_phone_number(phone_number=phone_number)
@@ -35,22 +40,14 @@ class UserService:
         return user
 
     async def get_user_by_id(self, user_id: UUID) -> UserOut:
-        user = await self.user_repo.get_obj(id=user_id)
-        
-        if not user: 
-            logger.warning(
-                "User not found by id",
-                extra={"user_id": str(user_id)}
-            )
-
-            return UserNotFoundException("User not found")
+        user = await self.helper.get_user_obj_or_404(user_id=user_id)
 
         logger.info("Successful response of user by id")
 
         return user
 
     async def update_profile(self, current_user_id: UUID, user_update: UserUpdate, avatar_file: UploadFile | None = None) -> dict[str, str]:
-        file_key = None
+        file_key: str | None = None
 
         try:
             data = user_update.model_dump(
@@ -97,3 +94,19 @@ class UserService:
                 await self.file_service.delete_file(file_key=file_key)
 
             raise DatabaseException("Database error")    
+
+    async def get_user_avatar_profile(self, current_user_id: UUID) -> FileResponse:
+        user = await self.helper.get_user_obj_or_404(user_id=current_user_id)
+
+        file_path = Path(user.avatar_url)
+
+        if not file_path.is_file():
+            logger.warning("Avatar file not found")
+
+            raise FileNotFoundException("Avatar file not found")
+
+        return FileResponse(
+            path=file_path,
+            media_type="image/*"
+        )
+
