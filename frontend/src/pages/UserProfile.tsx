@@ -1,5 +1,6 @@
 import {
     useEffect,
+    useRef,
     useState,
 } from 'react'
 
@@ -9,10 +10,9 @@ import {
 
 import {
     getUserProfile,
-    getUserAvatar,
     updateProfile,
+    getUserAvatar
 } from '../api/users'
-
 
 type UserProfile = {
     id: string
@@ -21,43 +21,67 @@ type UserProfile = {
     description?: string | null
 }
 
-
 export default function UserProfile() {
     const navigate = useNavigate()
 
-    const [profile, setProfile] =
-        useState<UserProfile | null>(null)
+    const avatarUrlRef = useRef<string | null>(null)
+    const previewUrlRef = useRef<string | null>(null)
 
-    const [username, setUsername] =
-        useState('')
+    const [profile, setProfile] = useState<UserProfile | null>(null)
+    const [username, setUsername] = useState('')
+    const [phoneNumber, setPhoneNumber] = useState('')
+    const [description, setDescription] = useState('')
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+    const [selectedAvatar, setSelectedAvatar] = useState<File | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [success, setSuccess] = useState<string | null>(null)
 
-    const [phoneNumber, setPhoneNumber] =
-        useState('')
+    // =========================================
+    // Set avatar URL
+    // =========================================
 
-    const [description, setDescription] =
-        useState('')
+    const replaceAvatarUrl = (newUrl: string | null) => {
+        // Освобождаем память только если новый URL отличается от старого
+        if (
+            avatarUrlRef.current &&
+            avatarUrlRef.current !== newUrl &&
+            avatarUrlRef.current.startsWith('blob:')
+        ) {
+            URL.revokeObjectURL(avatarUrlRef.current)
+        }
 
-    const [avatarUrl, setAvatarUrl] =
-        useState<string | null>(null)
+        avatarUrlRef.current = newUrl
+        setAvatarUrl(newUrl)
+    }
 
-    const [selectedAvatar, setSelectedAvatar] =
-        useState<File | null>(null)
+    // =========================================
+    // Set preview URL
+    // =========================================
 
-    const [previewUrl, setPreviewUrl] =
-        useState<string | null>(null)
+    const replacePreviewUrl = (newUrl: string | null) => {
+        if (
+            previewUrlRef.current &&
+            previewUrlRef.current !== newUrl &&
+            previewUrlRef.current.startsWith('blob:')
+        ) {
+            URL.revokeObjectURL(previewUrlRef.current)
+        }
 
-    const [loading, setLoading] =
-        useState(true)
+        previewUrlRef.current = newUrl
+        setPreviewUrl(newUrl)
+    }
 
-    const [saving, setSaving] =
-        useState(false)
+    // =========================================
+    // Load avatar
+    // =========================================
 
-    const [error, setError] =
-        useState<string | null>(null)
-
-    const [success, setSuccess] =
-        useState<string | null>(null)
-
+    const loadAvatar = async () => {
+        const url = await getUserAvatar()
+        replaceAvatarUrl(url)
+    }
 
     // =========================================
     // Load profile
@@ -69,138 +93,85 @@ export default function UserProfile() {
                 setLoading(true)
                 setError(null)
 
-                const user =
-                    await getUserProfile()
+                const user = await getUserProfile()
 
                 setProfile(user)
+                setUsername(user.username || '')
+                setPhoneNumber(user.phone_number || '')
+                setDescription(user.description || '')
 
-                setUsername(
-                    user.username || ''
-                )
-
-                setPhoneNumber(
-                    user.phone_number || ''
-                )
-
-                setDescription(
-                    user.description || ''
-                )
-
-                try {
-                    const url =
-                        await getUserAvatar()
-
-                    setAvatarUrl(url)
-
-                } catch (avatarError) {
-                    console.error(
-                        'Avatar loading error:',
-                        avatarError
-                    )
-                }
-
+                await loadAvatar()
             } catch (err: any) {
-                console.error(err)
-
+                console.error('Profile loading error:', err)
                 setError(
                     String(
                         err?.response?.data?.detail ||
                         err?.response?.data ||
+                        err?.message ||
                         err
                     )
                 )
-
             } finally {
                 setLoading(false)
             }
         }
 
         loadProfile()
-
     }, [])
 
-
     // =========================================
-    // Cleanup blob URLs
+    // Cleanup on unmount
     // =========================================
 
     useEffect(() => {
         return () => {
-            if (avatarUrl?.startsWith('blob:')) {
-                URL.revokeObjectURL(
-                    avatarUrl
-                )
+            if (
+                avatarUrlRef.current &&
+                avatarUrlRef.current.startsWith('blob:')
+            ) {
+                URL.revokeObjectURL(avatarUrlRef.current)
             }
 
-            if (previewUrl?.startsWith('blob:')) {
-                URL.revokeObjectURL(
-                    previewUrl
-                )
+            if (
+                previewUrlRef.current &&
+                previewUrlRef.current.startsWith('blob:')
+            ) {
+                URL.revokeObjectURL(previewUrlRef.current)
             }
         }
-    }, [
-        avatarUrl,
-        previewUrl,
-    ])
-
+    }, [])
 
     // =========================================
     // Avatar select
     // =========================================
 
     const handleAvatarChange = (
-        event: React.ChangeEvent<
-            HTMLInputElement
-        >
+        event: React.ChangeEvent<HTMLInputElement>
     ) => {
-        const file =
-            event.target.files?.[0]
+        const file = event.target.files?.[0]
 
         if (!file) {
             return
         }
 
-        if (
-            !file.type.startsWith(
-                'image/'
-            )
-        ) {
-            setError(
-                'Можно выбрать только изображение'
-            )
-
+        if (!file.type.startsWith('image/')) {
+            setError('Можно выбрать только изображение')
             return
         }
 
-        if (
-            previewUrl?.startsWith('blob:')
-        ) {
-            URL.revokeObjectURL(
-                previewUrl
-            )
-        }
+        const newPreviewUrl = URL.createObjectURL(file)
 
-        const newPreviewUrl =
-            URL.createObjectURL(file)
-
+        replacePreviewUrl(newPreviewUrl)
         setSelectedAvatar(file)
-
-        setPreviewUrl(
-            newPreviewUrl
-        )
-
         setError(null)
         setSuccess(null)
     }
-
 
     // =========================================
     // Save profile
     // =========================================
 
-    const handleSave = async (
-        event: React.FormEvent
-    ) => {
+    const handleSave = async (event: React.FormEvent) => {
         event.preventDefault()
 
         try {
@@ -208,71 +179,43 @@ export default function UserProfile() {
             setError(null)
             setSuccess(null)
 
-            const updatedUser =
-                await updateProfile({
-                    username: username.trim(),
-                    phoneNumber: phoneNumber.trim(),
-                    description: description.trim(),
-                    avatarFile: selectedAvatar,
-                })
+            const hasNewAvatar = selectedAvatar !== null
+
+            const updatedUser = await updateProfile({
+                username: username.trim(),
+                phoneNumber: phoneNumber.trim(),
+                description: description.trim(),
+                avatarFile: selectedAvatar,
+            })
 
             setProfile(updatedUser)
+            setUsername(updatedUser.username || '')
+            setPhoneNumber(updatedUser.phone_number || '')
+            setDescription(updatedUser.description || '')
 
-            setUsername(
-                updatedUser.username || ''
-            )
+            // Удаляем локальное превью перед загрузкой реального изображения с сервера
+            replacePreviewUrl(null)
+            setSelectedAvatar(null)
 
-            setPhoneNumber(
-                updatedUser.phone_number || ''
-            )
-
-            setDescription(
-                updatedUser.description || ''
-            )
-
-            if (selectedAvatar && previewUrl) {
-                if (
-                    avatarUrl?.startsWith(
-                        'blob:'
-                    )
-                ) {
-                    URL.revokeObjectURL(
-                        avatarUrl
-                    )
-                }
-
-                setAvatarUrl(
-                    previewUrl
-                )
-
-                setPreviewUrl(null)
-
-                setSelectedAvatar(null)
+            if (hasNewAvatar) {
+                await loadAvatar()
             }
 
-            setSuccess(
-                'Профиль успешно обновлён'
-            )
-
+            setSuccess('Профиль успешно обновлён')
         } catch (err: any) {
-            console.error(
-                'Profile update error:',
-                err
-            )
-
+            console.error('Profile update error:', err)
             setError(
                 String(
                     err?.response?.data?.detail ||
                     err?.response?.data ||
+                    err?.message ||
                     err
                 )
             )
-
         } finally {
             setSaving(false)
         }
     }
-
 
     // =========================================
     // Loading
@@ -288,35 +231,26 @@ export default function UserProfile() {
         )
     }
 
-
     // =========================================
-    // Error
+    // Profile error
     // =========================================
 
     if (!profile) {
         return (
             <div className="profile-page">
                 <div className="profile-error">
-                    {error ||
-                        'Не удалось загрузить профиль'}
+                    {error || 'Не удалось загрузить профиль'}
                 </div>
             </div>
         )
     }
 
-
     // =========================================
     // Avatar
     // =========================================
 
-    const displayedAvatar =
-        previewUrl || avatarUrl
-
-    const avatarLetter =
-        profile.username
-            ?.charAt(0)
-            .toUpperCase() || '?'
-
+    const displayedAvatar = previewUrl || avatarUrl
+    const avatarLetter = profile.username?.charAt(0).toUpperCase() || '?'
 
     // =========================================
     // Render
@@ -324,9 +258,7 @@ export default function UserProfile() {
 
     return (
         <div className="profile-page">
-
             <div className="profile-card">
-
                 <div className="profile-header">
                     <button
                         type="button"
@@ -337,48 +269,33 @@ export default function UserProfile() {
                     </button>
 
                     <div className="profile-header-content">
-                        <h2>
-                            Мой профиль
-                        </h2>
-
-                        <p>
-                            Управление информацией профиля
-                        </p>
+                        <h2>Мой профиль</h2>
+                        <p>Управление информацией профиля</p>
                     </div>
-
                 </div>
 
-
-                <form
-                    className="profile-form"
-                    onSubmit={handleSave}
-                >
-
+                <form className="profile-form" onSubmit={handleSave}>
                     {/* Avatar */}
-
                     <div className="profile-avatar-section">
-
                         <div className="profile-avatar-wrapper">
-
                             {displayedAvatar ? (
                                 <img
-                                    src={
-                                        displayedAvatar
-                                    }
+                                    src={displayedAvatar}
                                     alt="Аватар"
                                     className="profile-avatar-image"
+                                    onError={() => {
+                                        // Запасной вариант, если картинка не смогла отрисоваться
+                                        replaceAvatarUrl(null)
+                                    }}
                                 />
                             ) : (
                                 <div className="profile-avatar-placeholder">
                                     {avatarLetter}
                                 </div>
                             )}
-
                         </div>
 
-
                         <div className="profile-avatar-info">
-
                             <label
                                 htmlFor="avatar-input"
                                 className="avatar-upload-button"
@@ -389,122 +306,64 @@ export default function UserProfile() {
                             <input
                                 id="avatar-input"
                                 type="file"
-                                accept="image/*"
-                                onChange={
-                                    handleAvatarChange
-                                }
+                                accept="image/png, image/jpeg, image/jpg"
+                                onChange={handleAvatarChange}
                                 hidden
                             />
 
-                            <span>
-                                PNG, JPG, JPEG
-                            </span>
-
+                            <span>PNG, JPG, JPEG</span>
                         </div>
-
                     </div>
 
-
                     {/* Username */}
-
                     <div className="profile-field">
-
-                        <label>
-                            Имя пользователя
-                        </label>
-
+                        <label>Имя пользователя</label>
                         <input
                             type="text"
                             value={username}
-                            onChange={(event) =>
-                                setUsername(
-                                    event.target.value
-                                )
-                            }
+                            onChange={(e) => setUsername(e.target.value)}
                             placeholder="Введите имя пользователя"
                         />
-
                     </div>
 
-
                     {/* Phone */}
-
                     <div className="profile-field">
-
-                        <label>
-                            Номер телефона
-                        </label>
-
+                        <label>Номер телефона</label>
                         <input
                             type="tel"
                             value={phoneNumber}
-                            onChange={(event) =>
-                                setPhoneNumber(
-                                    event.target.value
-                                )
-                            }
+                            onChange={(e) => setPhoneNumber(e.target.value)}
                             placeholder="+7..."
                         />
-
                     </div>
 
-
                     {/* Description */}
-
                     <div className="profile-field">
-
-                        <label>
-                            О себе
-                        </label>
-
+                        <label>О себе</label>
                         <textarea
                             value={description}
-                            onChange={(event) =>
-                                setDescription(
-                                    event.target.value
-                                )
-                            }
+                            onChange={(e) => setDescription(e.target.value)}
                             placeholder="Расскажите немного о себе"
                             rows={5}
                         />
-
                     </div>
 
-
                     {/* Error */}
-
-                    {error && (
-                        <div className="profile-error">
-                            {error}
-                        </div>
-                    )}
-
+                    {error && <div className="profile-error">{error}</div>}
 
                     {/* Success */}
-
-                    {success && (
-                        <div className="profile-success">
-                            {success}
-                        </div>
-                    )}
-
+                    {success && <div className="profile-success">{success}</div>}
 
                     {/* Submit */}
-
                     <button
                         type="submit"
                         className="profile-save-button"
                         disabled={saving}
                     >
-                        {saving
-                            ? 'Сохранение...'
-                            : 'Сохранить изменения'}
+                        {saving ? 'Сохранение...' : 'Сохранить изменения'}
                     </button>
-
                 </form>
-
             </div>
-
         </div>
     )
 }

@@ -103,6 +103,11 @@ class UserService:
     async def get_user_avatar_profile(self, current_user_id: UUID) -> FileResponse:
         user = await self.helper.get_user_obj_or_404(user_id=current_user_id)
 
+        if not user.avatar_url:
+            logger.warning("Avatar file not found")
+
+            raise FileNotFoundException("Avatar file not found")
+
         file_path = Path(user.avatar_url)
 
         if not file_path.is_file():

@@ -9,43 +9,40 @@ export const getUserProfile = () =>
         .then((response) => response.data)
 
 
-type UpdateProfileData = {
+export type UpdateProfileData = {
     username?: string
     phoneNumber?: string
     description?: string
     avatarFile?: File | null
 }
 
+
 export const updateProfile = (
     data: UpdateProfileData
 ) => {
-    const formData = new FormData()
+    const formData =
+        new FormData()
 
-    if (data.username !== undefined) {
-        formData.append(
-            'username',
-            data.username
-        )
-    }
+    formData.append(
+        'username',
+        data.username || ''
+    )
 
-    if (data.phoneNumber !== undefined) {
-        formData.append(
-            'phone_number',
-            data.phoneNumber
-        )
-    }
+    formData.append(
+        'phone_number',
+        data.phoneNumber || ''
+    )
 
-    if (data.description !== undefined) {
-        formData.append(
-            'description',
-            data.description
-        )
-    }
+    formData.append(
+        'description',
+        data.description || ''
+    )
 
     if (data.avatarFile) {
         formData.append(
             'avatar_upload_file',
-            data.avatarFile
+            data.avatarFile,
+            data.avatarFile.name
         )
     }
 
@@ -54,20 +51,24 @@ export const updateProfile = (
             '/api/user/update/profile',
             formData
         )
-        .then((response) => response.data)
+        .then(
+            response => response.data
+        )
 }
 
 
-export const getUserAvatar = () =>
-    api
-        .get(
-            `/api/user/avatar`,
-            {
-                responseType: 'blob'
-            }
-        )
-        .then((response) =>
-            URL.createObjectURL(
-                response.data
-            )
-        )
+export const getUserAvatar = async (): Promise<string | null> => {
+    try {
+        const response = await api.get('/api/user/avatar', {
+            responseType: 'blob',
+        })
+
+        if (!response.data || response.data.size === 0) {
+            return null
+        }
+
+        return URL.createObjectURL(response.data)
+    } catch (error) {
+        return null
+    }
+}
