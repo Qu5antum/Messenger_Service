@@ -100,8 +100,8 @@ class UserService:
 
             raise DatabaseException("Database error")    
 
-    async def get_user_avatar_profile(self, current_user_id: UUID) -> FileResponse:
-        user = await self.helper.get_user_obj_or_404(user_id=current_user_id)
+    async def get_user_avatar_profile(self, user_id: UUID) -> FileResponse:
+        user = await self.helper.get_user_obj_or_404(user_id=user_id)
 
         if not user.avatar_url:
             logger.warning("Avatar file not found")
@@ -119,4 +119,3 @@ class UserService:
             path=file_path,
             media_type="image/*"
         )
-

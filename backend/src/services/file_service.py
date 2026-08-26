@@ -75,7 +75,7 @@ class FileService:
                 "Only JPG, PNG and WEBP images are allowed"
             )
         
-        directory = self.avatar_dir
+        directory = (self.avatar_dir / "user")
         
         directory.mkdir(
             parents=True,
@@ -104,6 +104,52 @@ class FileService:
             await file.close()
 
         return str(file_path)
+
+    async def save_chat_avatar_file(self, chat_id: UUID, file: UploadFile) -> str:
+        content_type = file.content_type
+        extension = Path(file.filename or "").suffix.lower()
+
+        allowed_extensions = ALLOWED_AVATAR_IMAGE_TYPES.get(
+            content_type
+        )
+
+        if allowed_extensions is None or extension not in allowed_extensions:
+            logger.warning("file type not image")
+
+            raise FileErrorException(
+                "Only JPG, PNG and WEBP images are allowed"
+            )
+        
+        directory = (self.avatar_dir / "chat")
+        
+        directory.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        filename = (
+            f"{chat_id}{extension}"
+        )
+
+        file_path = directory / filename
+
+        try:
+            with file_path.open("wb") as buffer:
+                while chunk := await file.read(1024 * 1024):
+                    buffer.write(chunk)
+
+        except FileErrorException as e:
+            logger.warning(f"File error exception: {e}")
+
+            raise FileErrorException("File error exception")
+        finally:
+            
+            logger.warning("File closed")
+
+            await file.close()
+
+        return str(file_path)
+
 
     async def delete_file(self, file_key: str) -> None:
         path = Path(file_key)

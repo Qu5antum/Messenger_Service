@@ -72,6 +72,7 @@ class Chat(Base):
     title: Mapped[str | None] = mapped_column(default=None)
     avatar: Mapped[str | None] = mapped_column(default=None)
     description: Mapped[str | None] = mapped_column(default=None)
+    chat_avatar_url: Mapped[str | None] = mapped_column(default=None)
 
     owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
     owner: Mapped[Optional['User']] = relationship(back_populates="own_chats")
@@ -116,13 +117,6 @@ class Message(Base):
     text: Mapped[Optional[str]] = mapped_column(nullable=True)
 
     message_type: Mapped[MessageType] = mapped_column(
-        SQLEnum(
-            MessageType,
-            name="messagetype",
-            values_callable=lambda enum_cls: [
-                item.value for item in enum_cls
-            ],
-        ),
         default=MessageType.TEXT,
         server_default=MessageType.TEXT.value,
         nullable=False,

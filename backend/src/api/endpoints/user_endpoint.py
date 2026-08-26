@@ -56,15 +56,15 @@ async def update_profile(
 
 
 @user_route.get("/user/avatar", status_code=200)
-async def get_avatar_image(
+async def get_current_user_avatar_image(
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     userService: UserService = Depends(get_user_service)
 ):
-    return await userService.get_user_avatar_profile(current_user_id=user.id) 
+    return await userService.get_user_avatar_profile(user_id=user.id)
 
 
-@user_route.get("/user/{user_id}", response_model=UserOut, status_code=200)
-async def get_user_by_id(
+@user_route.get("/user/{user_id}/profile", response_model=UserOut, status_code=200)
+async def get_user_profile(
     user_id: UUID,
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     userService: UserService = Depends(get_user_service)
@@ -72,3 +72,10 @@ async def get_user_by_id(
     return await userService.get_user_by_id(user_id=user_id)
 
 
+@user_route.get("/user/{user_id}/avatar", status_code=200)
+async def get_user_avatar_image(
+    user_id: UUID,
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
+    userService: UserService = Depends(get_user_service)
+):
+    return await userService.get_user_avatar_profile(user_id=user_id)

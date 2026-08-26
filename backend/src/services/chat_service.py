@@ -1,6 +1,9 @@
 import logging
 from sqlalchemy.exc import IntegrityError
 from uuid import UUID
+from fastapi import UploadFile
+from fastapi.responses import FileResponse
+from pathlib import Path
 
 from src.database.db import AsyncSession
 from src.database.models import User
@@ -11,7 +14,9 @@ from src.repositories.chat_participant_repository import ChatParticipantReposito
 from src.exception_handlers.user_exceptions import UserNotFoundException
 from src.exception_handlers.chat_exception import ChatIsNotGroupException, InvalidChatCreationException
 from src.exception_handlers.db_exception import DatabaseException
+from src.exception_handlers.file_exception import FileNotFoundException
 from .helper import Helper
+from .file_service import FileService
 
 logger = logging.getLogger("chat")
 
@@ -23,6 +28,7 @@ class ChatService:
 		self.chat_repo = ChatRepository(session=self.session, user_repo=self.user_repo)
 		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 		self.helper = Helper(session=self.session)
+		self.file_service = FileService()
 
 	async def create_private_chat(self, phone_number: str, current_user: User) -> ChatResponse:
 		user_id = await self.user_repo.get_user_id_by_phone_number(phone_number=phone_number)
@@ -93,7 +99,7 @@ class ChatService:
 
 		return new_private_chat
 
-	async def create_group_chat(self, chat: ChatCreate, user: User) -> ChatResponse:
+	async def create_group_chat(self, chat: ChatCreate, user: User, file: UploadFile | None = None) -> ChatResponse:
 		try:
 			new_group_chat = await self.chat_repo.create(
 				is_group=True,
@@ -102,6 +108,15 @@ class ChatService:
 				description=chat.description,
 				owner_id=user.id
 			)
+
+			if file:
+				file_key = (
+					await self.file_service.save_chat_avatar_file(
+						chat_id=new_group_chat.id
+					)
+				)
+
+				new_group_chat.chat_avatar_url = file_key
 
 			await self.chat_participant_repo.create(
 				chat_id=new_group_chat.id,
@@ -244,3 +259,23 @@ class ChatService:
 		)
 
 		return chats
+
+	async def get_chat_avatar_image(self, chat_id: UUID) -> FileResponse:
+		chat = await self.helper.get_chat_or_404(chatId=chat_id)
+
+		if not chat.chat_avatar_url:
+			logger.warning("Avatar file not found")
+
+			raise FileNotFoundException("Avatar file not found")
+
+		file_path = Path(chat.chat_avatar_url)
+
+		if not file_path.is_file():
+			logger.warning("Avatar file not found")
+
+			raise FileNotFoundException("Avatar file not found")
+
+		return FileResponse(
+			path=file_path,
+			media_type="image/*"
+		)
