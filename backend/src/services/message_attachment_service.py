@@ -6,6 +6,7 @@ from src.database.db import AsyncSession
 from .helper import Helper
 from src.repositories.message_attachment_repository import MessageAttachmentRepository
 from src.exception_handlers.message_exception import MessageAttachmentNotFoundException
+from .file_service import FileService
 
 logger = logging.getLogger("attachment")
 
@@ -15,6 +16,7 @@ class MessageAttachmentService:
         self.session = session
         self.helper = Helper(session=self.session)
         self.attachment_repo = MessageAttachmentRepository(session=self.session)
+        self.file_service = FileService()
 
     async def get_attachments(self, chat_id: UUID, attachment_id: UUID, current_user_id: UUID) -> FileResponse:
         await self.helper.get_chat_or_404(chatId=chat_id)
@@ -54,4 +56,10 @@ class MessageAttachmentService:
             }
         )
 
+    async def delete_files_in_attachments(self, message_id: UUID) -> None:
+        attachments = await self.attachment_repo.get_attachments_by_message_id(message_id=message_id)
 
+        for attachment in attachments:
+            await self.file_service.delete_file(file_key=attachment.file_key)
+
+        logger.info("Files in attachments deleted")

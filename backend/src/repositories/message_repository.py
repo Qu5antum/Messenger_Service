@@ -40,3 +40,16 @@ class MessageRepository(BaseRepository):
         )
 
         return result.scalar_one_or_none()
+
+    async def get_message_with_chat_id_sender_id(self, chat_id: UUID, sender_id: UUID, message_id: UUID) -> Optional[Message]:
+        result = await self.session.execute(
+            select(self.model)
+            .where(
+                self.model.id==message_id,
+                self.model.chat_id==chat_id,
+                self.model.sender_id==sender_id
+            )
+            .options(selectinload(self.model.attachments))
+        )
+
+        return result.scalar_one_or_none()

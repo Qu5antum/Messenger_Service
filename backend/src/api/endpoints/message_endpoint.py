@@ -61,13 +61,15 @@ async def edit_message(
     )
 
 
-@message_route.delete("/message/{message_id}/delete", status_code=200)
+@message_route.delete("/chat/{chat_id}/message/{message_id}/delete", status_code=200)
 async def delete_message(
+    chat_id: UUID,
     message_id: UUID,
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     messageService: MessageService = Depends(get_message_service)
 ):
     return await messageService.delete_message(
+        chat_id=chat_id,
         messageId=message_id,
         user=user
     )

@@ -9,12 +9,13 @@ from src.database.models import User, MessageType
 from src.repositories.message_repository import MessageRepository
 from src.api.schemas.message_schema import MessageRequest, MessageResponse, MessageUpdate
 from src.exception_handlers.db_exception import DatabaseException
-from src.exception_handlers.message_exception import MessageNotBelongToUserException
+from src.exception_handlers.message_exception import MessageNotBelongToUserException, MessageNotFoundException
 from .helper import Helper
 from src.publisher.chat_publisher import ChatPublisher
 from src.redis.redis_service import RedisService
 from src.repositories.message_attachment_repository import MessageAttachmentRepository
 from .file_service import FileService
+from .message_attachment_service import MessageAttachmentService
 
 logger = logging.getLogger("message")
 
@@ -27,6 +28,7 @@ class MessageService:
         self.chat_pub = ChatPublisher(redis=redis)
         self.attachment_repo = MessageAttachmentRepository(session=self.session)
         self.file_service = FileService()
+        self.attachment_service = MessageAttachmentService(session=self.session)
 
     @staticmethod
     def _get_message_type(content_type: str | None) -> MessageType:
@@ -209,20 +211,26 @@ class MessageService:
 
         return updated_message
 
-    async def delete_message(self, messageId: UUID, user: User) -> dict[str, str]:
-        message = await self.helper.get_message_or_404(messageId=messageId)
+    async def delete_message(self, chat_id: UUID, messageId: UUID, user: User) -> dict[str, str]:
+        await self.helper.get_chat_or_404(chatId=chat_id)
 
-        if message.sender_id != user.id:
+        await self.helper.get_participant_or_400(userId=user.id, chatId=chat_id)
+
+        message = await self.message_repo.get_message_with_chat_id_sender_id(chat_id=chat_id, sender_id=user.id, message_id=messageId)
+
+        if not message:
             logger.warning(
-                "Message not belong to user",
+                "Message not found",
                 extra={
+                    "chat_id": str(chat_id),
                     "message_id": str(messageId),
-                    "user_id": str(user.id)
+                    "sender_id": str(user.id)
                 }
             )
 
-            raise MessageNotBelongToUserException("Message not belong to user")
+            raise MessageNotFoundException("Message not found")
 
+        await self.attachment_service.delete_files_in_attachments(message_id=messageId)
         await self.message_repo.delete(id=messageId)
 
         logger.info(
