@@ -36,11 +36,27 @@ export const sendMessage = (
 }
 
 
-export const editMessage = (messageId: string, text: string) =>
-    api.put(`/api/message/${messageId}/update`, { text }).then((r) => r.data)
+export const editMessage = (
+    chatId: string,
+    messageId: string,
+    text: string
+) =>
+    api
+        .put(
+            `/api/chat/${chatId}/message/${messageId}/update`,
+            { text }
+        )
+        .then((r) => r.data)
 
-export const deleteMessage = (messageId: string) =>
-    api.delete(`/api/message/${messageId}/delete`).then((r) => r.data)
+export const deleteMessage = (
+    chatId: string,
+    messageId: string
+) =>
+    api
+        .delete(
+            `/api/chat/${chatId}/message/${messageId}/delete`
+        )
+        .then((r) => r.data)
 
 export const searchMessages = (chatId: string, messageText: string) =>
     api.get(`/api/chat/${chatId}/message/search_message`, {
