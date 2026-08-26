@@ -18,8 +18,6 @@ class ChatResponse(BaseModel):
 	chat_avatar_url: Optional[str] = None
 	description: Optional[str] = None
 	owner_id: Optional[UUID] = None
-	created_at: datetime
-	updated_at: datetime
 
 	model_config = ConfigDict(from_attributes=True)
 

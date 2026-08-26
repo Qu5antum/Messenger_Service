@@ -1,27 +1,119 @@
 import api from './client'
 
-export const getChats = () => api.get('/api/chat/all').then(r => r.data)
-
-export const createGroupChat = (payload: { title?: string; description?: string; avatar?: string }) =>
-    api.post('/api/chat/group_chat/create', { ...payload, is_group: true }).then(r => r.data)
-
-export const createPrivateChat = (phone_number: string) =>
-    api.post('/api/chat/private_chat/create', null, { params: { phone_number } }).then(r => r.data)
-
-export const getChat = (chatId: string) => api.get(`/api/chat/${chatId}`).then(r => r.data)
-
 export type ChatUpdate = {
     title?: string
-    avatar?: string
     description?: string
     owner_id?: string
+    file?: File | null
+}
+
+type CreateGroupChatData = {
+    title?: string
+    description?: string
+    file?: File | null
+}
+
+export const createGroupChat = (
+    data: CreateGroupChatData
+) => {
+    const formData = new FormData()
+
+    if (data.title) {
+        formData.append(
+            'title',
+            data.title
+        )
+    }
+
+    if (data.description) {
+        formData.append(
+            'description',
+            data.description
+        )
+    }
+
+    if (data.file) {
+        formData.append(
+            'file',
+            data.file
+        )
+    }
+
+    return api
+        .post(
+            '/api/chat/group_chat/create',
+            formData
+        )
+        .then(
+            (r) => r.data
+        )
 }
 
 export const updateChat = (
     chatId: string,
     data: ChatUpdate
-) =>
-    api.put(`/api/chat/${chatId}/chat_update`, data).then((r) => r.data)
+) => {
+    const formData = new FormData()
+
+    if (data.title !== undefined) {
+        formData.append(
+            'title',
+            data.title
+        )
+    }
+
+    if (data.description !== undefined) {
+        formData.append(
+            'description',
+            data.description
+        )
+    }
+
+    if (data.owner_id !== undefined) {
+        formData.append(
+            'owner_id',
+            data.owner_id
+        )
+    }
+
+    if (data.file) {
+        formData.append(
+            'file',
+            data.file
+        )
+    }
+
+    return api
+        .put(
+            `/api/chat/${chatId}/chat_update`,
+            formData
+        )
+        .then(
+            (r) => r.data
+        )
+}
+
+export const getChatAvatar = async (
+    chatId: string
+): Promise<string> => {
+    const response = await api.get(
+        `/api/chat/${chatId}/avatar`,
+        {
+            responseType: 'blob',
+        }
+    )
+
+    return URL.createObjectURL(
+        response.data
+    )
+}
+
+export const getChats = () => api.get('/api/chat/all').then(r => r.data)
+
+export const createPrivateChat = (phone_number: string) =>
+    api.post('/api/chat/private_chat/create', null, { params: { phone_number } }).then(r => r.data)
+
+export const getChat = (chatId: string) => api.get(`/api/chat/${chatId}`).then(r => r.data)
 
 export const deleteChat = (chatId: string) => 
     api.delete(`/api/chat/${chatId}/delete`).then((r) => r.data)

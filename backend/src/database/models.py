@@ -24,18 +24,20 @@ class Base(DeclarativeBase):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
-        default=uuid.uuid4
+        default=uuid.uuid4,
     )
 
-    created_at = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now()
-    )
-
-    updated_at = mapped_column(
+    created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        onupdate=func.now()
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
 
@@ -116,6 +118,13 @@ class Message(Base):
     text: Mapped[Optional[str]] = mapped_column(nullable=True)
 
     message_type: Mapped[MessageType] = mapped_column(
+        SQLEnum(
+            MessageType,
+            name="messagetype",
+            values_callable=lambda enum_cls: [
+                item.value for item in enum_cls
+            ],
+        ),
         default=MessageType.TEXT,
         server_default=MessageType.TEXT.value,
         nullable=False,

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
     getChats,
+    getChatAvatar,
     createGroupChat,
     createPrivateChat,
     updateChat,
@@ -21,43 +23,54 @@ type Chat = {
 
 type ChatUpdate = {
     title?: string
-    avatar?: string
     description?: string
     owner_id?: string
+    file?: File | null
 }
 
 export default function ChatsList() {
     const [chats, setChats] = useState<Chat[]>([])
-
     const [searchQuery, setSearchQuery] = useState('')
-
-    // Создание группы
     const [title, setTitle] = useState('')
-
-    // Создание личного чата
     const [phone, setPhone] = useState('')
-
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // Редактирование чата
     const [editingChatId, setEditingChatId] = useState<string | null>(null)
     const [editingTitle, setEditingTitle] = useState('')
     const [editingDescription, setEditingDescription] = useState('')
-    const [editingAvatar, setEditingAvatar] = useState('')
+    const [editingFile, setEditingFile] = useState<File | null>(null)
+    const [editingPreview, setEditingPreview] = useState<string | null>(null)
     const [editingLoading, setEditingLoading] = useState(false)
 
-    // Удаление чата
     const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
 
     const navigate = useNavigate()
     const { chatId } = useParams()
-
     const currentUserId = localStorage.getItem('user_id') || ''
 
-    // -----------------------------------------
-    // Загрузка чатов
-    // -----------------------------------------
+    const loadChatAvatars = async (chatList: Chat[]) => {
+        const updatedChats = await Promise.all(
+            chatList.map(async (chat) => {
+                if (!chat.is_group) {
+                    return chat
+                }
+
+                try {
+                    const avatar = await getChatAvatar(chat.id)
+
+                    return {
+                        ...chat,
+                        avatar,
+                    }
+                } catch {
+                    return chat
+                }
+            })
+        )
+
+        setChats(updatedChats)
+    }
 
     const load = async () => {
         setError(null)
@@ -67,7 +80,7 @@ export default function ChatsList() {
 
             const data = await getChats()
 
-            setChats(data)
+            await loadChatAvatars(data)
         } catch (e: any) {
             console.error(e)
 
@@ -85,11 +98,15 @@ export default function ChatsList() {
 
     useEffect(() => {
         load()
-    }, [])
 
-    // -----------------------------------------
-    // Создание группы
-    // -----------------------------------------
+        return () => {
+            chats.forEach((chat) => {
+                if (chat.avatar?.startsWith('blob:')) {
+                    URL.revokeObjectURL(chat.avatar)
+                }
+            })
+        }
+    }, [])
 
     const createGroup = async () => {
         const groupTitle = title.trim()
@@ -110,14 +127,25 @@ export default function ChatsList() {
 
             setTitle('')
 
-            // Добавляем новый чат в список,
-            // если backend возвращает полный ChatResponse
+            let newChat: Chat = res
+
+            if (newChat.is_group) {
+                try {
+                    newChat = {
+                        ...newChat,
+                        avatar: await getChatAvatar(newChat.id),
+                    }
+                } catch {
+                    // У группы может не быть аватара
+                }
+            }
+
             setChats((prev) => [
-                res,
+                newChat,
                 ...prev,
             ])
 
-            navigate(`/chat/${res.id}`)
+            navigate(`/chat/${newChat.id}`)
         } catch (e: any) {
             console.error(e)
 
@@ -133,10 +161,6 @@ export default function ChatsList() {
         }
     }
 
-    // -----------------------------------------
-    // Создание личного чата
-    // -----------------------------------------
-
     const createPrivate = async () => {
         const userPhone = phone.trim()
 
@@ -150,9 +174,7 @@ export default function ChatsList() {
         try {
             setLoading(true)
 
-            const res = await createPrivateChat(
-                userPhone
-            )
+            const res = await createPrivateChat(userPhone)
 
             setPhone('')
 
@@ -177,15 +199,7 @@ export default function ChatsList() {
         }
     }
 
-    // -----------------------------------------
-    // Начать редактирование
-    // -----------------------------------------
-
-    const handleStartEdit = (
-        chat: Chat
-    ) => {
-        // Дополнительная frontend-проверка.
-        // Backend всё равно обязан проверять владельца.
+    const handleStartEdit = (chat: Chat) => {
         if (
             !chat.is_group ||
             chat.owner_id !== currentUserId
@@ -194,37 +208,54 @@ export default function ChatsList() {
         }
 
         setEditingChatId(chat.id)
-
-        setEditingTitle(
-            chat.title || ''
-        )
-
-        setEditingDescription(
-            chat.description || ''
-        )
-
-        setEditingAvatar(
-            chat.avatar || ''
-        )
-
+        setEditingTitle(chat.title || '')
+        setEditingDescription(chat.description || '')
+        setEditingFile(null)
+        setEditingPreview(chat.avatar || null)
         setError(null)
     }
 
-    // -----------------------------------------
-    // Отмена редактирования
-    // -----------------------------------------
-
     const handleCancelEdit = () => {
-        setEditingChatId(null)
+        if (
+            editingPreview?.startsWith('blob:')
+        ) {
+            URL.revokeObjectURL(editingPreview)
+        }
 
+        setEditingChatId(null)
         setEditingTitle('')
         setEditingDescription('')
-        setEditingAvatar('')
+        setEditingFile(null)
+        setEditingPreview(null)
     }
 
-    // -----------------------------------------
-    // Сохранить изменения
-    // -----------------------------------------
+    const handleFileChange = (
+        e: ChangeEvent<HTMLInputElement>
+    ) => {
+        const file = e.target.files?.[0]
+
+        if (!file) {
+            return
+        }
+
+        if (!file.type.startsWith('image/')) {
+            setError('Можно выбрать только изображение')
+            return
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            setError('Размер изображения не должен превышать 5 МБ')
+            return
+        }
+
+        if (editingPreview?.startsWith('blob:')) {
+            URL.revokeObjectURL(editingPreview)
+        }
+
+        setEditingFile(file)
+        setEditingPreview(URL.createObjectURL(file))
+        setError(null)
+    }
 
     const handleSaveEdit = async () => {
         if (!editingChatId) {
@@ -232,8 +263,7 @@ export default function ChatsList() {
         }
 
         const chat = chats.find(
-            (item) =>
-                item.id === editingChatId
+            (item) => item.id === editingChatId
         )
 
         if (!chat) {
@@ -244,47 +274,51 @@ export default function ChatsList() {
             !chat.is_group ||
             chat.owner_id !== currentUserId
         ) {
-            setError(
-                'Только владелец может изменить чат'
-            )
-
+            setError('Только владелец может изменить чат')
             return
         }
 
-        const newTitle =
-            editingTitle.trim()
-
-        const newDescription =
-            editingDescription.trim()
-
-        const newAvatar =
-            editingAvatar.trim()
+        const newTitle = editingTitle.trim()
+        const newDescription = editingDescription.trim()
 
         if (!newTitle) {
-            setError(
-                'Название группы не может быть пустым'
-            )
-
+            setError('Название группы не может быть пустым')
             return
         }
 
         const data: ChatUpdate = {
             title: newTitle,
-            description:
-                newDescription || undefined,
-            avatar:
-                newAvatar || undefined,
+            description: newDescription || undefined,
+            file: editingFile,
         }
 
         try {
             setEditingLoading(true)
             setError(null)
 
-            const updatedChat =
-                await updateChat(
-                    editingChatId,
-                    data
-                )
+            const updatedChat = await updateChat(
+                editingChatId,
+                data
+            )
+
+            let newAvatar = chat.avatar
+
+            if (editingFile) {
+                try {
+                    newAvatar = await getChatAvatar(
+                        editingChatId
+                    )
+                } catch {
+                    newAvatar = undefined
+                }
+            }
+
+            if (
+                chat.avatar?.startsWith('blob:') &&
+                chat.avatar !== newAvatar
+            ) {
+                URL.revokeObjectURL(chat.avatar)
+            }
 
             setChats((prev) =>
                 prev.map((item) =>
@@ -292,6 +326,7 @@ export default function ChatsList() {
                         ? {
                             ...item,
                             ...updatedChat,
+                            avatar: newAvatar,
                         }
                         : item
                 )
@@ -313,28 +348,18 @@ export default function ChatsList() {
         }
     }
 
-    // -----------------------------------------
-    // Удаление чата
-    // -----------------------------------------
-
-    const handleDelete = async (
-        chat: Chat
-    ) => {
+    const handleDelete = async (chat: Chat) => {
         if (
             !chat.is_group ||
             chat.owner_id !== currentUserId
         ) {
-            setError(
-                'Только владелец может удалить чат'
-            )
-
+            setError('Только владелец может удалить чат')
             return
         }
 
-        const confirmed =
-            window.confirm(
-                `Удалить группу "${chat.title || 'Группа'}"?\n\nВсе сообщения и данные группы будут удалены.`
-            )
+        const confirmed = window.confirm(
+            `Удалить группу "${chat.title || 'Группа'}"?\n\nВсе сообщения и данные группы будут удалены.`
+        )
 
         if (!confirmed) {
             return
@@ -346,15 +371,16 @@ export default function ChatsList() {
 
             await deleteChat(chat.id)
 
+            if (chat.avatar?.startsWith('blob:')) {
+                URL.revokeObjectURL(chat.avatar)
+            }
+
             setChats((prev) =>
                 prev.filter(
-                    (item) =>
-                        item.id !== chat.id
+                    (item) => item.id !== chat.id
                 )
             )
 
-            // Если удалили открытый чат,
-            // переходим на список чатов
             if (
                 String(chat.id) ===
                 String(chatId)
@@ -376,31 +402,19 @@ export default function ChatsList() {
         }
     }
 
-    // -----------------------------------------
-    // Поиск чатов
-    // -----------------------------------------
+    const filteredChats = chats.filter((chat) => {
+        const name =
+            chat.title ||
+            (
+                chat.is_group
+                    ? 'Группа'
+                    : 'Личный чат'
+            )
 
-    const filteredChats = chats.filter(
-        (chat) => {
-            const name =
-                chat.title ||
-                (
-                    chat.is_group
-                        ? 'Группа'
-                        : 'Личный чат'
-                )
-
-            return name
-                .toLowerCase()
-                .includes(
-                    searchQuery.toLowerCase()
-                )
-        }
-    )
-
-    // -----------------------------------------
-    // Render
-    // -----------------------------------------
+        return name
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
+    })
 
     return (
         <div
@@ -418,24 +432,17 @@ export default function ChatsList() {
                     <span className="profile-icon">
                         👤
                     </span>
-
                     <span>
                         Мой профиль
                     </span>
                 </Link>
             </div>
 
-            {/* ================================= */}
-            {/* Поиск */}
-            {/* ================================= */}
-
             <div className="sidebar-search">
                 <div className="search-input-wrapper">
-
                     <span className="search-icon">
                         🔍
                     </span>
-
                     <input
                         type="text"
                         placeholder="Поиск чатов..."
@@ -446,13 +453,8 @@ export default function ChatsList() {
                             )
                         }
                     />
-
                 </div>
             </div>
-
-            {/* ================================= */}
-            {/* Создание группы / личного чата */}
-            {/* ================================= */}
 
             <div
                 style={{
@@ -464,16 +466,12 @@ export default function ChatsList() {
                     gap: '8px',
                 }}
             >
-
-                {/* Группа */}
-
                 <div
                     className="search-input-wrapper"
                     style={{
                         gap: '6px',
                     }}
                 >
-
                     <input
                         type="text"
                         placeholder="Название группы"
@@ -484,9 +482,7 @@ export default function ChatsList() {
                             )
                         }
                         onKeyDown={(e) => {
-                            if (
-                                e.key === 'Enter'
-                            ) {
+                            if (e.key === 'Enter') {
                                 createGroup()
                             }
                         }}
@@ -494,7 +490,6 @@ export default function ChatsList() {
                             paddingLeft: '10px',
                         }}
                     />
-
                     <button
                         className="btn-primary"
                         onClick={createGroup}
@@ -503,18 +498,13 @@ export default function ChatsList() {
                             !title.trim()
                         }
                         style={{
-                            padding:
-                                '6px 12px',
-                            fontSize:
-                                '0.8rem',
+                            padding: '6px 12px',
+                            fontSize: '0.8rem',
                         }}
                     >
                         + Группа
                     </button>
-
                 </div>
-
-                {/* Личный чат */}
 
                 <div
                     className="search-input-wrapper"
@@ -522,7 +512,6 @@ export default function ChatsList() {
                         gap: '6px',
                     }}
                 >
-
                     <input
                         type="text"
                         placeholder="Телефон пользователя"
@@ -533,9 +522,7 @@ export default function ChatsList() {
                             )
                         }
                         onKeyDown={(e) => {
-                            if (
-                                e.key === 'Enter'
-                            ) {
+                            if (e.key === 'Enter') {
                                 createPrivate()
                             }
                         }}
@@ -543,385 +530,311 @@ export default function ChatsList() {
                             paddingLeft: '10px',
                         }}
                     />
-
                     <button
                         className="btn-primary"
-                        onClick={
-                            createPrivate
-                        }
+                        onClick={createPrivate}
                         disabled={
                             loading ||
                             !phone.trim()
                         }
                         style={{
-                            padding:
-                                '6px 12px',
-                            fontSize:
-                                '0.8rem',
+                            padding: '6px 12px',
+                            fontSize: '0.8rem',
                         }}
                     >
                         + Чат
                     </button>
-
                 </div>
 
                 {error && (
                     <div
                         style={{
-                            color:
-                                'var(--danger)',
-                            fontSize:
-                                '0.8rem',
-                            marginTop:
-                                '4px',
+                            color: 'var(--danger)',
+                            fontSize: '0.8rem',
+                            marginTop: '4px',
                         }}
                     >
                         {error}
                     </div>
                 )}
-
             </div>
 
-            {/* ================================= */}
-            {/* Список чатов */}
-            {/* ================================= */}
-
             <div className="chats-list">
-
-                {loading &&
-                chats.length === 0 ? (
-
+                {loading && chats.length === 0 ? (
                     <div
                         style={{
-                            padding:
-                                '16px',
-                            textAlign:
-                                'center',
-                            color:
-                                'var(--muted)',
-                            fontSize:
-                                '0.88rem',
+                            padding: '16px',
+                            textAlign: 'center',
+                            color: 'var(--muted)',
+                            fontSize: '0.88rem',
                         }}
                     >
                         Загрузка чатов...
                     </div>
-
-                ) : filteredChats.length ===
-                  0 ? (
-
+                ) : filteredChats.length === 0 ? (
                     <div
                         style={{
-                            padding:
-                                '16px',
-                            textAlign:
-                                'center',
-                            color:
-                                'var(--muted)',
-                            fontSize:
-                                '0.88rem',
+                            padding: '16px',
+                            textAlign: 'center',
+                            color: 'var(--muted)',
+                            fontSize: '0.88rem',
                         }}
                     >
                         Чаты не найдены
                     </div>
-
                 ) : (
+                    filteredChats.map((chat) => {
+                        const name =
+                            chat.title ||
+                            (
+                                chat.is_group
+                                    ? 'Группа'
+                                    : 'Личный чат'
+                            )
 
-                    filteredChats.map(
-                        (chat) => {
+                        const isActive =
+                            String(chat.id) ===
+                            String(chatId)
 
-                            const name =
-                                chat.title ||
-                                (
-                                    chat.is_group
-                                        ? 'Группа'
-                                        : 'Личный чат'
-                                )
+                        const isOwner =
+                            chat.is_group &&
+                            chat.owner_id ===
+                            currentUserId
 
-                            const isActive =
-                                String(
-                                    chat.id
-                                ) ===
-                                String(
-                                    chatId
-                                )
+                        const isEditing =
+                            editingChatId ===
+                            chat.id
 
-                            const isOwner =
-                                chat.is_group &&
-                                chat.owner_id ===
-                                currentUserId
+                        const isDeleting =
+                            deletingChatId ===
+                            chat.id
 
-                            const isEditing =
-                                editingChatId ===
-                                chat.id
-
-                            const isDeleting =
-                                deletingChatId ===
-                                chat.id
-
-                            // =================================
-                            // Редактирование
-                            // =================================
-
-                            if (isEditing) {
-                                return (
-                                    <div
-                                        key={
-                                            chat.id
-                                        }
-                                        className={`chat-item ${
-                                            isActive
-                                                ? 'active'
-                                                : ''
-                                        }`}
-                                        style={{
-                                            cursor:
-                                                'default',
-                                        }}
-                                    >
-
-                                        <div className="chat-avatar">
-                                            {name
-                                                .charAt(
-                                                    0
-                                                )
-                                                .toUpperCase()}
-                                        </div>
-
-                                        <div
-                                            className="chat-details"
-                                            style={{
-                                                display:
-                                                    'flex',
-                                                flexDirection:
-                                                    'column',
-                                                gap:
-                                                    '6px',
-                                            }}
-                                        >
-
-                                            <input
-                                                value={
-                                                    editingTitle
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    setEditingTitle(
-                                                        e.target
-                                                            .value
-                                                    )
-                                                }
-                                                placeholder="Название"
-                                                autoFocus
-                                            />
-
-                                            <input
-                                                value={
-                                                    editingDescription
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    setEditingDescription(
-                                                        e.target
-                                                            .value
-                                                    )
-                                                }
-                                                placeholder="Описание"
-                                            />
-
-                                            <input
-                                                value={
-                                                    editingAvatar
-                                                }
-                                                onChange={(
-                                                    e
-                                                ) =>
-                                                    setEditingAvatar(
-                                                        e.target
-                                                            .value
-                                                    )
-                                                }
-                                                placeholder="URL аватара"
-                                            />
-
-                                            <div
-                                                style={{
-                                                    display:
-                                                        'flex',
-                                                    gap:
-                                                        '6px',
-                                                }}
-                                            >
-
-                                                <button
-                                                    onClick={
-                                                        handleSaveEdit
-                                                    }
-                                                    disabled={
-                                                        editingLoading
-                                                    }
-                                                    className="btn-primary"
-                                                >
-                                                    {editingLoading
-                                                        ? 'Сохранение...'
-                                                        : 'Сохранить'}
-                                                </button>
-
-                                                <button
-                                                    onClick={
-                                                        handleCancelEdit
-                                                    }
-                                                    disabled={
-                                                        editingLoading
-                                                    }
-                                                >
-                                                    Отмена
-                                                </button>
-
-                                            </div>
-
-                                        </div>
-
-                                    </div>
-                                )
-                            }
-
-                            // =================================
-                            // Обычный чат
-                            // =================================
-
+                        if (isEditing) {
                             return (
                                 <div
-                                    key={
-                                        chat.id
-                                    }
-                                    className={`chat-item-wrapper ${
-                                        isActive
-                                            ? 'active'
-                                            : ''
-                                    }`}
+                                    key={chat.id}
+                                    className={`chat-item ${isActive ? 'active' : ''}`}
+                                    style={{
+                                        cursor: 'default',
+                                    }}
                                 >
-
-                                    <Link
-                                        to={`/chat/${chat.id}`}
-                                        className={`chat-item ${
-                                            isActive
-                                                ? 'active'
-                                                : ''
-                                        }`}
+                                    <div
+                                        className="chat-avatar"
+                                        style={{
+                                            overflow: 'hidden',
+                                        }}
                                     >
+                                        {editingPreview ? (
+                                            <img
+                                                src={editingPreview}
+                                                alt={name}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    borderRadius: '50%',
+                                                }}
+                                            />
+                                        ) : (
+                                            name
+                                                .charAt(0)
+                                                .toUpperCase()
+                                        )}
+                                    </div>
 
-                                        <div className="chat-avatar">
-                                            {chat.avatar ? (
-                                                <img
-                                                    src={
-                                                        chat.avatar
-                                                    }
-                                                    alt={
-                                                        name
-                                                    }
-                                                    style={{
-                                                        width:
-                                                            '100%',
-                                                        height:
-                                                            '100%',
-                                                        objectFit:
-                                                            'cover',
-                                                        borderRadius:
-                                                            '50%',
-                                                    }}
-                                                />
-                                            ) : (
-                                                name
-                                                    .charAt(
-                                                        0
-                                                    )
-                                                    .toUpperCase()
-                                            )}
-                                        </div>
-
-                                        <div className="chat-details">
-
-                                            <div className="chat-top-row">
-
-                                                <span className="chat-title">
-                                                    {name}
-                                                </span>
-
-                                                <span className="chat-time">
-                                                    {
-                                                        chat.last_message_time ||
-                                                        ''
-                                                    }
-                                                </span>
-
-                                            </div>
-
-                                            <div className="chat-last-message">
-                                                {
-                                                    chat.last_message ||
-                                                    (
-                                                        chat.is_group
-                                                            ? 'Групповой чат'
-                                                            : 'Личная переписка'
-                                                    )
-                                                }
-                                            </div>
-
-                                        </div>
-
-                                    </Link>
-
-                                    {/* ================================= */}
-                                    {/* Owner actions */}
-                                    {/* ================================= */}
-
-                                    {isOwner && (
-                                        <div
-                                            className="chat-actions"
-                                            onClick={(
-                                                e
-                                            ) =>
-                                                e.stopPropagation()
+                                    <div
+                                        className="chat-details"
+                                        style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '6px',
+                                        }}
+                                    >
+                                        <input
+                                            value={editingTitle}
+                                            onChange={(e) =>
+                                                setEditingTitle(
+                                                    e.target.value
+                                                )
                                             }
+                                            placeholder="Название"
+                                            autoFocus
+                                        />
+
+                                        <input
+                                            value={editingDescription}
+                                            onChange={(e) =>
+                                                setEditingDescription(
+                                                    e.target.value
+                                                )
+                                            }
+                                            placeholder="Описание"
+                                        />
+
+                                        <label
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '4px',
+                                                fontSize: '0.8rem',
+                                            }}
                                         >
-
-                                            <button
-                                                type="button"
-                                                title="Редактировать чат"
-                                                onClick={() =>
-                                                    handleStartEdit(
-                                                        chat
-                                                    )
+                                            Фото группы
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={
+                                                    handleFileChange
                                                 }
-                                            >
-                                                ✎
-                                            </button>
+                                            />
+                                        </label>
 
+                                        {editingFile && (
+                                            <span
+                                                style={{
+                                                    fontSize: '0.75rem',
+                                                    color: 'var(--muted)',
+                                                }}
+                                            >
+                                                {editingFile.name}
+                                            </span>
+                                        )}
+
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                gap: '6px',
+                                            }}
+                                        >
                                             <button
-                                                type="button"
-                                                title="Удалить чат"
-                                                onClick={() =>
-                                                    handleDelete(
-                                                        chat
-                                                    )
+                                                onClick={
+                                                    handleSaveEdit
                                                 }
                                                 disabled={
-                                                    isDeleting
+                                                    editingLoading
                                                 }
+                                                className="btn-primary"
                                             >
-                                                {isDeleting
-                                                    ? '...'
-                                                    : '×'}
+                                                {editingLoading
+                                                    ? 'Сохранение...'
+                                                    : 'Сохранить'}
                                             </button>
 
+                                            <button
+                                                onClick={
+                                                    handleCancelEdit
+                                                }
+                                                disabled={
+                                                    editingLoading
+                                                }
+                                            >
+                                                Отмена
+                                            </button>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             )
                         }
-                    )
+
+                        return (
+                            <div
+                                key={chat.id}
+                                className={`chat-item-wrapper ${isActive ? 'active' : ''}`}
+                            >
+                                <Link
+                                    to={`/chat/${chat.id}`}
+                                    className={`chat-item ${isActive ? 'active' : ''}`}
+                                >
+                                    <div
+                                        className="chat-avatar"
+                                        style={{
+                                            overflow: 'hidden',
+                                        }}
+                                    >
+                                        {chat.avatar ? (
+                                            <img
+                                                src={chat.avatar}
+                                                alt={name}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    borderRadius: '50%',
+                                                }}
+                                            />
+                                        ) : (
+                                            name
+                                                .charAt(0)
+                                                .toUpperCase()
+                                        )}
+                                    </div>
+
+                                    <div className="chat-details">
+                                        <div className="chat-top-row">
+                                            <span className="chat-title">
+                                                {name}
+                                            </span>
+                                            <span className="chat-time">
+                                                {
+                                                    chat.last_message_time ||
+                                                    ''
+                                                }
+                                            </span>
+                                        </div>
+
+                                        <div className="chat-last-message">
+                                            {
+                                                chat.last_message ||
+                                                (
+                                                    chat.is_group
+                                                        ? 'Групповой чат'
+                                                        : 'Личная переписка'
+                                                )
+                                            }
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                {isOwner && (
+                                    <div
+                                        className="chat-actions"
+                                        onClick={(e) =>
+                                            e.stopPropagation()
+                                        }
+                                    >
+                                        <button
+                                            type="button"
+                                            title="Редактировать чат"
+                                            onClick={() =>
+                                                handleStartEdit(
+                                                    chat
+                                                )
+                                            }
+                                        >
+                                            ✎
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            title="Удалить чат"
+                                            onClick={() =>
+                                                handleDelete(
+                                                    chat
+                                                )
+                                            }
+                                            disabled={
+                                                isDeleting
+                                            }
+                                        >
+                                            {isDeleting
+                                                ? '...'
+                                                : '×'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })
                 )}
             </div>
         </div>
