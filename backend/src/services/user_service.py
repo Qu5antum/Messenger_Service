@@ -66,7 +66,9 @@ class UserService:
                     )
                 )
 
-            await self.user_repo.update_user_profile(current_user_id=current_user_id, data=data, file_key=file_key)
+            user.avatar_url = file_key
+
+            await self.user_repo.update(id=current_user_id, data=data)
 
             logger.info("User profile successfully updated")
 
