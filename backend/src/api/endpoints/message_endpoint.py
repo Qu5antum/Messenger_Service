@@ -29,34 +29,29 @@ async def send_message(
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     messageService: MessageService = Depends(get_message_service)
 ):
-    message_obj = None
-
-    if message and message.strip():
-        try:
-            message_obj = MessageRequest.model_validate_json(message)
-        except ValidationError:
-            raise HTTPException(
-                status_code=422,
-                detail="Invalid message format",
-            )
+    message = MessageRequest(
+        text=message
+    )
 
     return await messageService.send_message(
         chatId=chat_id, 
         sender_id=user.id, 
-        message_create=message_obj,
+        message_create=message,
         file=file
     )
 
-@message_route.put("/message/{message_id}/update", response_model=MessageResponse, status_code=200)
+@message_route.put("/chat/{chat_id}/message/{message_id}/update", response_model=MessageResponse, status_code=200)
 async def edit_message(
+    chat_id: UUID,
     message_id: UUID,
     message_update: MessageUpdate,
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
     messageService: MessageService = Depends(get_message_service)
 ):
     return await messageService.edit_message(
-        messageId=message_id,
-        sender=user,
+        chat_id=chat_id,
+        message_id=message_id,
+        sender_id=user.id,
         message_update=message_update
     )
 
@@ -70,8 +65,8 @@ async def delete_message(
 ):
     return await messageService.delete_message(
         chat_id=chat_id,
-        messageId=message_id,
-        user=user
+        message_id=message_id,
+        sender_id=user.id
     )
 
 

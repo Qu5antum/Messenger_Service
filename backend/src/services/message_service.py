@@ -9,7 +9,7 @@ from src.database.models import User, MessageType
 from src.repositories.message_repository import MessageRepository
 from src.api.schemas.message_schema import MessageRequest, MessageResponse, MessageUpdate
 from src.exception_handlers.db_exception import DatabaseException
-from src.exception_handlers.message_exception import MessageNotBelongToUserException, MessageNotFoundException
+from src.exception_handlers.message_exception import MessageNotFoundException
 from .helper import Helper
 from src.publisher.chat_publisher import ChatPublisher
 from src.redis.redis_service import RedisService
@@ -164,26 +164,29 @@ class MessageService:
 
         return message_response
 
-    async def edit_message(self, messageId: UUID, sender: User, message_update: MessageUpdate) -> MessageResponse:
-        # implement redis service
-        message = await self.helper.get_message_or_404(messageId=messageId)
+    async def edit_message(self, chat_id: UUID, message_id: UUID, sender_id: UUID, message_update: MessageUpdate) -> MessageResponse:
+        await self.helper.get_chat_or_404(chatId=chat_id)
+        await self.helper.get_participant_or_400(userId=sender_id, chatId=chat_id)
 
-        if message.sender_id != sender.id:
+        message = await self.message_repo.get_message_with_chat_id_sender_id(chat_id=chat_id, sender_id=sender_id, message_id=message_id)
+
+        if not message:
             logger.warning(
-                "Message not belong to user",
+                "Message not found",
                 extra={
-                    "message_id": str(messageId),
-                    "user_id": str(sender.id)
+                    "message_id": str(message_id),
+                    "chat_id": str(chat_id),
+                    "message_id": str(message_id)
                 }
             )
 
-            raise MessageNotBelongToUserException("Message not belong to user")
+            return MessageNotFoundException("Message not found")
 
         try:
             data = message_update.model_dump(exclude_unset=True)
 
             updated_message = await self.message_repo.update(
-                id=messageId,
+                id=message_id,
                 data=data
             )
 
@@ -194,8 +197,8 @@ class MessageService:
                 "Message not updated, Database error",
                 exc_info=True,
                 extra={
-                    "message_id": str(messageId),
-                    "user_id": str(sender.id)
+                    "message_id": str(message_id),
+                    "user_id": str(sender_id)
                 }
             )
 
@@ -204,40 +207,39 @@ class MessageService:
         logger.info(
             "Message updated",
             extra={
-                "message_id": str(messageId),
-                "user_id": str(sender.id)
+                "message_id": str(message_id),
+                "user_id": str(sender_id)
             }
         )
 
         return updated_message
 
-    async def delete_message(self, chat_id: UUID, messageId: UUID, user: User) -> dict[str, str]:
+    async def delete_message(self, chat_id: UUID, message_id: UUID, sender_id: UUID) -> dict[str, str]:
         await self.helper.get_chat_or_404(chatId=chat_id)
+        await self.helper.get_participant_or_400(userId=sender_id, chatId=chat_id)
 
-        await self.helper.get_participant_or_400(userId=user.id, chatId=chat_id)
-
-        message = await self.message_repo.get_message_with_chat_id_sender_id(chat_id=chat_id, sender_id=user.id, message_id=messageId)
+        message = await self.message_repo.get_message_with_chat_id_sender_id(chat_id=chat_id, sender_id=sender_id, message_id=message_id)
 
         if not message:
             logger.warning(
                 "Message not found",
                 extra={
                     "chat_id": str(chat_id),
-                    "message_id": str(messageId),
-                    "sender_id": str(user.id)
+                    "message_id": str(message_id),
+                    "sender_id": str(sender_id)
                 }
             )
 
             raise MessageNotFoundException("Message not found")
 
-        await self.attachment_service.delete_files_in_attachments(message_id=messageId)
-        await self.message_repo.delete(id=messageId)
+        await self.attachment_service.delete_files_in_attachments(message_id=message_id)
+        await self.message_repo.delete(id=message_id)
 
         logger.info(
             "Message successfully deleted",
             extra={
-                "message_id": str(messageId),
-                "user_id": str(user.id)
+                "message_id": str(message_id),
+                "user_id": str(sender_id)
             }
         )
 
