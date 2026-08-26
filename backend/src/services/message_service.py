@@ -64,8 +64,6 @@ class MessageService:
                 file.content_type
             )
 
-        file_key = None
-
         try:
             new_message = await self.message_repo.create(
                 text=message_create.text if message_create else None,

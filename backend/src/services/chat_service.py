@@ -1,5 +1,5 @@
 import logging
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from uuid import UUID
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
@@ -138,18 +138,36 @@ class ChatService:
 	
 			return new_group_chat
 
-		except IntegrityError:
+		except IntegrityError as e:
 			await self.session.rollback()
 
 			logger.error(
-				"Database error, chat not created",
+				f"Database error, chat not created: {e}",
 				exc_info=True,
 				extra={"user_id": str(user.id)}
 			)
 
+			if file_key:
+				await self.file_service.delete_file(file_key=file_key)
+
 			raise DatabaseException("Database error, chat not created")
 
-	async def update_chat(self, chatId: UUID, chatUpdate: ChatUpdate, user: User) -> ChatResponse:
+		except SQLAlchemyError as e:
+			await self.session.rollback()
+		
+			logger.error(
+				f"Database error, chat not created: {e}",
+				exc_info=True,
+				extra={"user_id": str(user.id)}
+			)
+
+			if file_key:
+				await self.file_service.delete_file(file_key=file_key)
+
+			raise DatabaseException("Database error, chat not created")
+
+
+	async def update_chat(self, chatId: UUID, chatUpdate: ChatUpdate, user: User, file: UploadFile | None = None) -> ChatResponse:
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
 		if not chat.is_group:
@@ -164,6 +182,19 @@ class ChatService:
 
 		try:
 			data = chatUpdate.model_dump(exclude_unset=True)
+
+			if chat.chat_avatar_url and file:
+				await self.file_service.delete_file(file_key=chat.chat_avatar_url)
+
+			if file:
+				file_key = (
+					await self.file_service.save_chat_avatar_file(
+						chat_id=chatId,
+						file=file
+					)
+				)
+
+			chat.chat_avatar_url = file_key
 
 			update_chat = await self.chat_repo.update(
 				id=chatId,

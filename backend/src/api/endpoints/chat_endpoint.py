@@ -45,11 +45,20 @@ async def create_group_chat(
 @chat_route.put("/chat/{chat_id}/chat_update", response_model=ChatResponse, status_code=200)
 async def update_chat(
 	chat_id: UUID,
-	chatUpdate: ChatUpdate,
+	title: str | None = Form(None),
+	description: str | None = Form(None),
+	owner_id: UUID | None = Form(None),
+	file: UploadFile | None = None,
 	user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
 	chatService: ChatService = Depends(get_chat_service)
 ):
-	return await chatService.update_chat(chatId=chat_id, chatUpdate=chatUpdate, user=user)
+	chat_update = ChatUpdate(
+		title=title,
+		description=description,
+		owner_id=owner_id
+	)
+
+	return await chatService.update_chat(chatId=chat_id, chatUpdate=chat_update, user=user, file=file)
 
 
 @chat_route.get("/chat/{chat_id}/avatar", status_code=200)

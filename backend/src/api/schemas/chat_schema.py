@@ -26,7 +26,6 @@ class ChatResponse(BaseModel):
 
 class ChatUpdate(BaseModel):
 	title: Optional[str] = None
-	chat_avatar_url: Optional[str] = None
 	description: Optional[str] = None
 	owner_id: Optional[UUID] = None
 

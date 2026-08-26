@@ -49,8 +49,6 @@ class UserService:
     async def update_profile(self, current_user_id: UUID, user_update: UserUpdate, avatar_file: UploadFile | None = None) -> dict[str, str]:
         user = await self.helper.get_user_obj_or_404(user_id=current_user_id)
 
-        file_key: str | None = None
-
         try:
             data = user_update.model_dump(
                 exclude_unset=True,
@@ -82,9 +80,6 @@ class UserService:
                 extra={"user_id": str(current_user_id)}
             )
 
-            if file_key:
-                await self.file_service.delete_file(file_key=file_key)
-
             raise DatabaseException("Database error")
 
         except SQLAlchemyError as e:
@@ -94,9 +89,6 @@ class UserService:
                 f"Error, profile not updated: {e}",
                 extra={"user_id": str(current_user_id)}
             )
-
-            if file_key:
-                await self.file_service.delete_file(file_key=file_key)
 
             raise DatabaseException("Database error")    
 
