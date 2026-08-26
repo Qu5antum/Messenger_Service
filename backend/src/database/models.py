@@ -70,9 +70,8 @@ class Chat(Base):
 
     is_group: Mapped[bool] = mapped_column(default=False)
     title: Mapped[str | None] = mapped_column(default=None)
-    avatar: Mapped[str | None] = mapped_column(default=None)
-    description: Mapped[str | None] = mapped_column(default=None)
     chat_avatar_url: Mapped[str | None] = mapped_column(default=None)
+    description: Mapped[str | None] = mapped_column(default=None)
 
     owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"))
     owner: Mapped[Optional['User']] = relationship(back_populates="own_chats")

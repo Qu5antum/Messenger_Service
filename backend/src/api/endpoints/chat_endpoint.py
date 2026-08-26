@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, Form
 from uuid import UUID
 
 from src.database.db import AsyncSession, get_session
@@ -28,11 +28,18 @@ async def create_private_chat(
 
 @chat_route.post("/chat/group_chat/create", response_model=ChatResponse, status_code=201)
 async def create_group_chat(
-	chatCreate: ChatCreate,
+	title: str | None = Form(None),
+	description: str | None = Form(None),
+	file: UploadFile | None = None,
 	user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
 	chatService: ChatService = Depends(get_chat_service)
 ):
-	return await chatService.create_group_chat(chat=chatCreate, user=user)
+	chat_create = ChatCreate(
+		title=title,
+		description=description,
+	)
+
+	return await chatService.create_group_chat(chat=chat_create, user=user, file=file)
 
 
 @chat_route.put("/chat/{chat_id}/chat_update", response_model=ChatResponse, status_code=200)
@@ -43,6 +50,15 @@ async def update_chat(
 	chatService: ChatService = Depends(get_chat_service)
 ):
 	return await chatService.update_chat(chatId=chat_id, chatUpdate=chatUpdate, user=user)
+
+
+@chat_route.get("/chat/{chat_id}/avatar", status_code=200)
+async def get_chat_avatar(
+	chat_id: UUID,
+	user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
+	chatService: ChatService = Depends(get_chat_service)
+):
+	return await chatService.get_chat_avatar_image(chat_id=chat_id, user_id=user.id)
 
 
 @chat_route.delete("/chat/{chat_id}/delete", status_code=200)

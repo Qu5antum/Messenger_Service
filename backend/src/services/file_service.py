@@ -1,4 +1,3 @@
-import shutil
 from pathlib import Path
 from uuid import UUID
 from fastapi import UploadFile

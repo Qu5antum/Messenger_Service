@@ -8,16 +8,14 @@ from .user_schema import UserOut
 
 class ChatCreate(BaseModel):
 	title: Optional[str] = None
-	avatar: Optional[str] = None
 	description: Optional[str] = None
-	is_group: bool = False
 
 
 class ChatResponse(BaseModel):
 	id: UUID
 	is_group: bool
 	title: Optional[str] = None
-	avatar: Optional[str] = None
+	chat_avatar_url: Optional[str] = None
 	description: Optional[str] = None
 	owner_id: Optional[UUID] = None
 	created_at: datetime
@@ -28,7 +26,7 @@ class ChatResponse(BaseModel):
 
 class ChatUpdate(BaseModel):
 	title: Optional[str] = None
-	avatar: Optional[str] = None
+	chat_avatar_url: Optional[str] = None
 	description: Optional[str] = None
 	owner_id: Optional[UUID] = None
 

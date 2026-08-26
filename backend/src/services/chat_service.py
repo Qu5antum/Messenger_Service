@@ -104,7 +104,6 @@ class ChatService:
 			new_group_chat = await self.chat_repo.create(
 				is_group=True,
 				title=chat.title,
-				avatar=chat.avatar,
 				description=chat.description,
 				owner_id=user.id
 			)
@@ -112,7 +111,8 @@ class ChatService:
 			if file:
 				file_key = (
 					await self.file_service.save_chat_avatar_file(
-						chat_id=new_group_chat.id
+						chat_id=new_group_chat.id,
+						file=file
 					)
 				)
 
@@ -129,6 +129,14 @@ class ChatService:
 			)
 
 			await self.session.commit()
+			await self.session.refresh(new_group_chat)
+
+			logger.info(
+				"New group chat created",
+				extra={"user_id": str(user.id)}
+			)
+	
+			return new_group_chat
 
 		except IntegrityError:
 			await self.session.rollback()
@@ -140,13 +148,6 @@ class ChatService:
 			)
 
 			raise DatabaseException("Database error, chat not created")
-
-		logger.info(
-			"New group chat created",
-			extra={"user_id": str(user.id)}
-		)
-
-		return new_group_chat
 
 	async def update_chat(self, chatId: UUID, chatUpdate: ChatUpdate, user: User) -> ChatResponse:
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
@@ -260,8 +261,10 @@ class ChatService:
 
 		return chats
 
-	async def get_chat_avatar_image(self, chat_id: UUID) -> FileResponse:
+	async def get_chat_avatar_image(self, chat_id: UUID, user_id: UUID) -> FileResponse:
 		chat = await self.helper.get_chat_or_404(chatId=chat_id)
+
+		await self.helper.get_participant_or_400(chatId=chat_id, userId=user_id)
 
 		if not chat.chat_avatar_url:
 			logger.warning("Avatar file not found")
