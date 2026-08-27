@@ -3,18 +3,41 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from .base_repository import BaseRepository
-from src.database.models import ChatParticipant
+from src.database.models import ChatParticipant, Chat
 
 
 class ChatParticipantRepository(BaseRepository):
 	model = ChatParticipant
 
-	async def get_private_chat_of_two_user(self, userId1: UUID, userId2: UUID):
-		result = await self.session.execute(
+	async def get_private_chat_of_two_user(self, user_id: UUID, current_user_id: UUID):
+		participant_subquery = (
 			select(self.model.chat_id)
-			.where(self.model.user_id.in_([userId1, userId2]))
+			.where(
+				self.model.user_id.in_([
+					user_id,
+					current_user_id
+				])
+			)
 			.group_by(self.model.chat_id)
-			.having(func.count(self.model.chat_id) == 2)
+			.having(
+				func.count(
+					func.distinct(self.model.user_id)
+				) == 2
+			)
+			.subquery()
+		)
+
+		result = await self.session.execute(
+			select(Chat)
+			.where(
+				Chat.id.in_(
+					select(
+						participant_subquery.c.chat_id
+					)
+				),
+				Chat.is_group.is_(False)
+			)
+			.options(selectinload(Chat.chat_participants))
 		)
 
 		return result.scalar_one_or_none()

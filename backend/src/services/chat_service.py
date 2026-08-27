@@ -49,15 +49,15 @@ class ChatService:
 
 			raise InvalidChatCreationException("User can't create private chat for yourself")
 
-		chat_participant_id = await self.chat_participant_repo.get_private_chat_of_two_user(
-			userId1=user_id,
-			userId2=current_user.id
+		chat_participant = await self.chat_participant_repo.get_private_chat_of_two_user(
+			user_id=user_id,
+			current_user_id=current_user.id
 		)
 
-		if chat_participant_id:
-			chat = await self.chat_repo.get(id=chat_participant_id)
+		if chat_participant and not chat_participant.is_group:
+			chat = await self.chat_repo.get(id=chat_participant.id)
 
-			logger.info("Chat already exists of this users")
+			logger.info("Private chat already exists between these users")
 
 			return ChatResponse.model_validate(chat)
 		try:
