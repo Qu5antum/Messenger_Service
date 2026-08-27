@@ -100,6 +100,8 @@ class ChatService:
 		return new_private_chat
 
 	async def create_group_chat(self, chat: ChatCreate, user: User, file: UploadFile | None = None) -> ChatResponse:
+		file_key: str | None = None
+
 		try:
 			new_group_chat = await self.chat_repo.create(
 				is_group=True,
@@ -180,6 +182,8 @@ class ChatService:
 
 		await self.helper.get_owner_or_403(ownerId=user.id, chatId=chatId)
 
+		file_key: str | None = None
+
 		try:
 			data = chatUpdate.model_dump(exclude_unset=True, exclude_none=True)
 
@@ -201,11 +205,21 @@ class ChatService:
 				data=data
 			)
 
-		except IntegrityError:
+			logger.info(
+				"Chat successfully updated",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(user.id)
+				}
+			)
+	
+			return update_chat
+
+		except IntegrityError as e:
 			await self.session.rollback()
 
 			logger.error(
-				"Database error, chat not updated",
+				f"Database error, chat not updated {e}",
 				exc_info=True,
 				extra={
 					"chat_id": str(chatId),
@@ -215,15 +229,20 @@ class ChatService:
 
 			raise DatabaseException("Chat not updated")
 
-		logger.info(
-			"Chat successfully updated",
-			extra={
-				"chat_id": str(chatId),
-				"user_id": str(user.id)
-			}
-		)
+		except SQLAlchemyError as e:
+			await self.session.rollback()
 
-		return update_chat
+			logger.error(
+				f"Database error, chat not updated {e}",
+				exc_info=True,
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(user.id)
+				}
+			)
+
+			raise DatabaseException("Chat not updated")
+
 
 	async def delete_chat(self, chatId: UUID, user: User) -> dict[str, str]:
 		chat = await self.helper.get_chat_or_404(chatId=chatId)

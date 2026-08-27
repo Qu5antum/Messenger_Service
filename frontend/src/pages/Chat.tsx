@@ -31,6 +31,7 @@ import {
     removeParticipant,
     leaveChat,
 } from '../api/chats'
+
 type MessageAttachment = {
     id: string
     message_id: string
@@ -40,6 +41,7 @@ type MessageAttachment = {
     size: number
     duration?: number | null
 }
+
 type Message = {
     id: string
     chat_id: string
@@ -54,17 +56,20 @@ type Message = {
     } | null
     attachments: MessageAttachment[]
 }
+
 type Chat = {
     id: string
     title?: string
     is_group?: boolean
     owner_id?: string | null
 }
+
 type ParticipantUser = {
     id: string
     username?: string
     phone_number?: string | null
 }
+
 type Participant = {
     id: string
     chat_id: string
@@ -72,9 +77,11 @@ type Participant = {
     joined_at: string
     user?: ParticipantUser | null
 }
+
 export default function Chat() {
     const { chatId = '' } = useParams()
     const navigate = useNavigate()
+
     const [messages, setMessages] = useState<Message[]>([])
     const [text, setText] = useState('')
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -84,17 +91,23 @@ export default function Chat() {
     const [loading, setLoading] = useState(false)
     const [sending, setSending] = useState(false)
     const [error, setError] = useState<string | null>(null)
+
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
     const [editingText, setEditingText] = useState('')
     const [editingLoading, setEditingLoading] = useState(false)
+
     const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null)
+
     const [searchText, setSearchText] = useState('')
     const [searchResults, setSearchResults] = useState<Message[]>([])
     const [searchLoading, setSearchLoading] = useState(false)
     const [isSearching, setIsSearching] = useState(false)
+
     const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({})
+
     const [isRecording, setIsRecording] = useState(false)
     const [recordingTime, setRecordingTime] = useState(0)
+
     const wsRef = useRef<WebSocket | null>(null)
     const messagesEndRef = useRef<HTMLDivElement | null>(null)
     const imageInputRef = useRef<HTMLInputElement | null>(null)
@@ -103,63 +116,97 @@ export default function Chat() {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const recordingChunksRef = useRef<Blob[]>([])
     const recordingTimerRef = useRef<number | null>(null)
+
     const currentUserId = localStorage.getItem('user_id') || ''
     const currentUsername = localStorage.getItem('username') || ''
+
     const isGroupChat = chat?.is_group === true
     const isOwner = isGroupChat && chat?.owner_id === currentUserId
+
     const scrollToBottom = (smooth = true) => {
         messagesEndRef.current?.scrollIntoView({
             behavior: smooth ? 'smooth' : 'auto',
         })
     }
+
     const formatFileSize = (bytes: number) => {
         if (!bytes) {
             return '0 Bytes'
         }
+
         const sizes = [
             'Bytes',
             'KB',
             'MB',
             'GB',
         ]
+
         const index = Math.min(
             Math.floor(Math.log(bytes) / Math.log(1024)),
             sizes.length - 1
         )
+
         return `${(
             bytes / Math.pow(1024, index)
         ).toFixed(2)} ${sizes[index]}`
     }
+
     const formatRecordingTime = (seconds: number) => {
         const minutes = Math.floor(seconds / 60)
         const remainingSeconds = seconds % 60
+
         return `${String(minutes).padStart(2, '0')}:${String(
             remainingSeconds
         ).padStart(2, '0')}`
     }
+
+    const isMessageEdited = (message: Message) => {
+        if (!message.edited_at || !message.sent_at) {
+            return false
+        }
+
+        const sentAt = new Date(message.sent_at).getTime()
+        const editedAt = new Date(message.edited_at).getTime()
+
+        if (
+            Number.isNaN(sentAt) ||
+            Number.isNaN(editedAt)
+        ) {
+            return false
+        }
+
+        return editedAt !== sentAt
+    }
+
     useEffect(() => {
         if (!chatId) {
             return
         }
+
         const loadData = async () => {
             try {
                 setLoading(true)
                 setError(null)
+
                 const chatInfo = await getChat(chatId)
                 setChat(chatInfo)
+
                 const msgs = await getMessages(chatId)
                 setMessages(msgs)
+
                 if (chatInfo.is_group) {
                     const parts = await getParticipants(chatId)
                     setParticipants(parts)
                 } else {
                     setParticipants([])
                 }
+
                 setTimeout(() => {
                     scrollToBottom(false)
                 }, 100)
             } catch (e: any) {
                 console.error(e)
+
                 setError(
                     String(
                         e?.response?.data?.detail ||
@@ -171,25 +218,31 @@ export default function Chat() {
                 setLoading(false)
             }
         }
+
         loadData()
     }, [chatId])
+
     useEffect(() => {
         if (!chatId || messages.length === 0) {
             return
         }
+
         const loadAttachments = async () => {
             const allAttachments = messages.flatMap(
                 (message) => message.attachments || []
             )
+
             for (const attachment of allAttachments) {
                 if (attachmentUrls[attachment.id]) {
                     continue
                 }
+
                 try {
                     const url = await getAttachment(
                         chatId,
                         attachment.id
                     )
+
                     setAttachmentUrls((prev) => ({
                         ...prev,
                         [attachment.id]: url,
@@ -202,8 +255,10 @@ export default function Chat() {
                 }
             }
         }
+
         loadAttachments()
     }, [messages, chatId])
+
     useEffect(() => {
         return () => {
             Object.values(attachmentUrls).forEach((url) => {
@@ -211,40 +266,51 @@ export default function Chat() {
             })
         }
     }, [attachmentUrls])
+
     useEffect(() => {
         if (!chatId) {
             return
         }
+
         const token = localStorage.getItem('access_token')
+
         if (!token) {
             return
         }
+
         const ws = new WebSocket(buildWsUrl(token))
         wsRef.current = ws
+
         ws.onopen = () => {
             console.log('WebSocket connected')
         }
+
         ws.onmessage = (event) => {
             try {
                 const payload = JSON.parse(event.data)
+
                 if (
                     payload.type === 'message_created' &&
                     String(payload.chat_id) === String(chatId)
                 ) {
                     const newMessage: Message = payload.data
+
                     setMessages((prev) => {
                         const exists = prev.some(
                             (message) =>
                                 message.id === newMessage.id
                         )
+
                         if (exists) {
                             return prev
                         }
+
                         return [
                             ...prev,
                             newMessage,
                         ]
                     })
+
                     setTimeout(() => {
                         scrollToBottom()
                     }, 50)
@@ -256,48 +322,58 @@ export default function Chat() {
                 )
             }
         }
+
         ws.onerror = (event) => {
             console.error(
                 'WebSocket error:',
                 event
             )
         }
+
         ws.onclose = () => {
             console.log('WebSocket disconnected')
         }
+
         return () => {
             ws.close()
             wsRef.current = null
         }
     }, [chatId])
+
     const handleSelectFile = (file: File | undefined) => {
         if (!file) {
             return
         }
+
         setSelectedFile(file)
         setError(null)
     }
+
     const handleImageChange = (
         e: ChangeEvent<HTMLInputElement>
     ) => {
         handleSelectFile(e.target.files?.[0])
         e.target.value = ''
     }
+
     const handleVideoChange = (
         e: ChangeEvent<HTMLInputElement>
     ) => {
         handleSelectFile(e.target.files?.[0])
         e.target.value = ''
     }
+
     const handleFileChange = (
         e: ChangeEvent<HTMLInputElement>
     ) => {
         handleSelectFile(e.target.files?.[0])
         e.target.value = ''
     }
+
     const handleRemoveSelectedFile = () => {
         setSelectedFile(null)
     }
+
     const handleSend = async () => {
         if (
             !chatId ||
@@ -308,35 +384,44 @@ export default function Chat() {
         ) {
             return
         }
+
         try {
             setSending(true)
             setError(null)
+
             const textToSend = text.trim()
             const fileToSend = selectedFile
+
             setText('')
             setSelectedFile(null)
+
             const data = await sendMessage(
                 chatId,
                 textToSend || undefined,
                 fileToSend
             )
+
             setMessages((prev) => {
                 const exists = prev.some(
                     (message) => message.id === data.id
                 )
+
                 if (exists) {
                     return prev
                 }
+
                 return [
                     ...prev,
                     data,
                 ]
             })
+
             setTimeout(() => {
                 scrollToBottom()
             }, 50)
         } catch (e: any) {
             console.error(e)
+
             setError(
                 String(
                     e?.response?.data?.detail ||
@@ -348,6 +433,7 @@ export default function Chat() {
             setSending(false)
         }
     }
+
     const handleKeyDown = (
         e: KeyboardEvent<HTMLInputElement>
     ) => {
@@ -359,15 +445,20 @@ export default function Chat() {
             handleSend()
         }
     }
+
     const startRecording = async () => {
         try {
             setError(null)
+
             const stream =
                 await navigator.mediaDevices.getUserMedia({
                     audio: true,
                 })
+
             const recorder = new MediaRecorder(stream)
+
             recordingChunksRef.current = []
+
             recorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     recordingChunksRef.current.push(
@@ -375,6 +466,7 @@ export default function Chat() {
                     )
                 }
             }
+
             recorder.onstop = () => {
                 const audioBlob = new Blob(
                     recordingChunksRef.current,
@@ -384,10 +476,12 @@ export default function Chat() {
                             'audio/webm',
                     }
                 )
+
                 const extension =
                     audioBlob.type.includes('ogg')
                         ? 'ogg'
                         : 'webm'
+
                 const audioFile = new File(
                     [audioBlob],
                     `voice-${Date.now()}.${extension}`,
@@ -395,28 +489,36 @@ export default function Chat() {
                         type: audioBlob.type,
                     }
                 )
+
                 setSelectedFile(audioFile)
+
                 stream.getTracks().forEach(
                     (track) => track.stop()
                 )
+
                 setIsRecording(false)
                 setRecordingTime(0)
             }
+
             recorder.start()
             mediaRecorderRef.current = recorder
+
             setIsRecording(true)
             setRecordingTime(0)
+
             recordingTimerRef.current =
                 window.setInterval(() => {
                     setRecordingTime((prev) => prev + 1)
                 }, 1000)
         } catch (e) {
             console.error(e)
+
             setError(
                 'Не удалось получить доступ к микрофону'
             )
         }
     }
+
     const stopRecording = () => {
         if (
             mediaRecorderRef.current &&
@@ -424,13 +526,16 @@ export default function Chat() {
         ) {
             mediaRecorderRef.current.stop()
         }
+
         if (recordingTimerRef.current !== null) {
             window.clearInterval(
                 recordingTimerRef.current
             )
+
             recordingTimerRef.current = null
         }
     }
+
     useEffect(() => {
         return () => {
             if (recordingTimerRef.current !== null) {
@@ -438,6 +543,7 @@ export default function Chat() {
                     recordingTimerRef.current
                 )
             }
+
             if (
                 mediaRecorderRef.current &&
                 mediaRecorderRef.current.state !== 'inactive'
@@ -446,6 +552,7 @@ export default function Chat() {
             }
         }
     }, [])
+
     const handleStartEdit = (message: Message) => {
         if (
             message.sender_id !== currentUserId ||
@@ -453,34 +560,42 @@ export default function Chat() {
         ) {
             return
         }
+
         setEditingMessageId(message.id)
         setEditingText(message.text)
         setError(null)
     }
+
     const handleCancelEdit = () => {
         setEditingMessageId(null)
         setEditingText('')
     }
+
     const handleSaveEdit = async () => {
         if (!chatId || !editingMessageId) {
             return
         }
+
         const newText = editingText.trim()
+
         if (!newText) {
             setError(
                 'Сообщение не может быть пустым'
             )
             return
         }
+
         try {
             setEditingLoading(true)
             setError(null)
+
             const updatedMessage =
                 await editMessage(
                     chatId,
                     editingMessageId,
                     newText
                 )
+
             setMessages((prev) =>
                 prev.map((message) =>
                     message.id === editingMessageId
@@ -488,6 +603,7 @@ export default function Chat() {
                         : message
                 )
             )
+
             setSearchResults((prev) =>
                 prev.map((message) =>
                     message.id === editingMessageId
@@ -495,9 +611,11 @@ export default function Chat() {
                         : message
                 )
             )
+
             handleCancelEdit()
         } catch (e: any) {
             console.error(e)
+
             setError(
                 String(
                     e?.response?.data?.detail ||
@@ -509,28 +627,34 @@ export default function Chat() {
             setEditingLoading(false)
         }
     }
+
     const handleDeleteMessage = async (
         messageId: string
     ) => {
         if (!chatId) {
             return
         }
+
         if (!window.confirm('Удалить это сообщение?')) {
             return
         }
+
         try {
             setDeletingMessageId(messageId)
             setError(null)
+
             await deleteMessage(
                 chatId,
                 messageId
             )
+
             setMessages((prev) =>
                 prev.filter(
                     (message) =>
                         message.id !== messageId
                 )
             )
+
             setSearchResults((prev) =>
                 prev.filter(
                     (message) =>
@@ -539,6 +663,7 @@ export default function Chat() {
             )
         } catch (e: any) {
             console.error(e)
+
             setError(
                 String(
                     e?.response?.data?.detail ||
@@ -550,25 +675,31 @@ export default function Chat() {
             setDeletingMessageId(null)
         }
     }
+
     const handleSearch = async () => {
         const query = searchText.trim()
+
         if (!chatId || !query) {
             setSearchResults([])
             setIsSearching(false)
             return
         }
+
         try {
             setSearchLoading(true)
             setIsSearching(true)
             setError(null)
+
             const results =
                 await searchMessages(
                     chatId,
                     query
                 )
+
             setSearchResults(results)
         } catch (e: any) {
             console.error(e)
+
             setError(
                 String(
                     e?.response?.data?.detail ||
@@ -580,6 +711,7 @@ export default function Chat() {
             setSearchLoading(false)
         }
     }
+
     const handleSearchKeyDown = (
         e: KeyboardEvent<HTMLInputElement>
     ) => {
@@ -588,28 +720,36 @@ export default function Chat() {
             handleSearch()
         }
     }
+
     const handleClearSearch = () => {
         setSearchText('')
         setSearchResults([])
         setIsSearching(false)
     }
+
     const handleAddParticipant = async () => {
         const phone = newParticipantPhone.trim()
+
         if (!phone || !chatId) {
             return
         }
+
         try {
             setError(null)
+
             await addParticipant(
                 chatId,
                 phone
             )
+
             const parts =
                 await getParticipants(chatId)
+
             setParticipants(parts)
             setNewParticipantPhone('')
         } catch (e: any) {
             console.error(e)
+
             setError(
                 String(
                     e?.response?.data?.detail ||
@@ -619,19 +759,24 @@ export default function Chat() {
             )
         }
     }
+
     const handleRemoveParticipant = async (
         participant: Participant
     ) => {
         const userId = participant.user?.id
+
         if (!chatId || !userId) {
             return
         }
+
         try {
             setError(null)
+
             await removeParticipant(
                 chatId,
                 userId
             )
+
             setParticipants((prev) =>
                 prev.filter(
                     (item) =>
@@ -640,6 +785,7 @@ export default function Chat() {
             )
         } catch (e: any) {
             console.error(e)
+
             setError(
                 String(
                     e?.response?.data?.detail ||
@@ -649,19 +795,25 @@ export default function Chat() {
             )
         }
     }
+
     const handleLeaveChat = async () => {
         if (!chatId) {
             return
         }
+
         if (!window.confirm('Покинуть группу?')) {
             return
         }
+
         try {
             setError(null)
+
             await leaveChat(chatId)
+
             navigate('/')
         } catch (e: any) {
             console.error(e)
+
             setError(
                 String(
                     e?.response?.data?.detail ||
@@ -671,11 +823,13 @@ export default function Chat() {
             )
         }
     }
+
     const renderAttachment = (
         attachment: MessageAttachment
     ) => {
         const url =
             attachmentUrls[attachment.id]
+
         if (!url) {
             return (
                 <div
@@ -686,6 +840,7 @@ export default function Chat() {
                 </div>
             )
         }
+
         if (
             attachment.mime_type.startsWith(
                 'image/'
@@ -707,6 +862,7 @@ export default function Chat() {
                 </div>
             )
         }
+
         if (
             attachment.mime_type.startsWith(
                 'video/'
@@ -733,6 +889,7 @@ export default function Chat() {
                 </div>
             )
         }
+
         if (
             attachment.mime_type.startsWith(
                 'audio/'
@@ -759,6 +916,7 @@ export default function Chat() {
                 </div>
             )
         }
+
         return (
             <div
                 key={attachment.id}
@@ -773,21 +931,29 @@ export default function Chat() {
             </div>
         )
     }
+
     const renderMessage = (
         message: Message
     ) => {
         const isMine =
             message.sender_id === currentUserId
+
         const senderName =
             isMine
                 ? currentUsername || 'Вы'
                 : message.sender?.username ||
                   message.sender?.phone_number ||
                   message.sender_id
+
         const isEditing =
             editingMessageId === message.id
+
         const isDeleting =
             deletingMessageId === message.id
+
+        const edited =
+            isMessageEdited(message)
+
         return (
             <div
                 key={message.id}
@@ -798,6 +964,7 @@ export default function Chat() {
                 <div className="message-author">
                     {senderName}
                 </div>
+
                 {isEditing ? (
                     <div className="message-edit">
                         <input
@@ -818,6 +985,7 @@ export default function Chat() {
                             }}
                             autoFocus
                         />
+
                         <div className="message-edit-actions">
                             <button
                                 type="button"
@@ -832,6 +1000,7 @@ export default function Chat() {
                                     ? 'Сохранение...'
                                     : 'Сохранить'}
                             </button>
+
                             <button
                                 type="button"
                                 onClick={
@@ -850,16 +1019,19 @@ export default function Chat() {
                         {message.text && (
                             <div className="message-bubble">
                                 {message.text}
-                                {message.edited_at && (
+
+                                {edited && (
                                     <span className="edited-label">
                                         изменено
                                     </span>
                                 )}
                             </div>
                         )}
+
                         {message.attachments?.map(
                             renderAttachment
                         )}
+
                         {isMine && (
                             <div className="message-actions">
                                 {message.text && (
@@ -874,6 +1046,7 @@ export default function Chat() {
                                         Изменить
                                     </button>
                                 )}
+
                                 <button
                                     type="button"
                                     onClick={() =>
@@ -896,6 +1069,7 @@ export default function Chat() {
             </div>
         )
     }
+
     return (
         <div className="chat-page">
             <div className="chat-header">
@@ -903,6 +1077,7 @@ export default function Chat() {
                     <h2>
                         {chat?.title || 'Чат'}
                     </h2>
+
                     {isGroupChat && (
                         <p className="chat-meta">
                             Участников:{' '}
@@ -910,6 +1085,7 @@ export default function Chat() {
                         </p>
                     )}
                 </div>
+
                 <div className="chat-search">
                     <input
                         placeholder="Поиск сообщений..."
@@ -923,6 +1099,7 @@ export default function Chat() {
                             handleSearchKeyDown
                         }
                     />
+
                     <button
                         type="button"
                         onClick={handleSearch}
@@ -932,6 +1109,7 @@ export default function Chat() {
                             ? '...'
                             : 'Найти'}
                     </button>
+
                     {isSearching && (
                         <button
                             type="button"
@@ -944,16 +1122,19 @@ export default function Chat() {
                     )}
                 </div>
             </div>
+
             {isSearching && (
                 <div className="search-results">
                     <div className="search-results-header">
                         <h3>
                             Результаты поиска
                         </h3>
+
                         <span>
                             {searchResults.length}
                         </span>
                     </div>
+
                     {searchResults.length === 0 ? (
                         <div className="search-empty">
                             Ничего не найдено
@@ -965,6 +1146,7 @@ export default function Chat() {
                     )}
                 </div>
             )}
+
             <div className="chat-grid">
                 <section className="chat-window">
                     <div className="message-list">
@@ -982,10 +1164,12 @@ export default function Chat() {
                                 renderMessage
                             )
                         )}
+
                         <div
                             ref={messagesEndRef}
                         />
                     </div>
+
                     <input
                         ref={imageInputRef}
                         type="file"
@@ -995,6 +1179,7 @@ export default function Chat() {
                             handleImageChange
                         }
                     />
+
                     <input
                         ref={videoInputRef}
                         type="file"
@@ -1004,6 +1189,7 @@ export default function Chat() {
                             handleVideoChange
                         }
                     />
+
                     <input
                         ref={fileInputRef}
                         type="file"
@@ -1012,18 +1198,21 @@ export default function Chat() {
                             handleFileChange
                         }
                     />
+
                     {selectedFile && (
                         <div className="selected-file">
                             <div className="selected-file-info">
                                 <span className="selected-file-name">
                                     {selectedFile.name}
                                 </span>
+
                                 <span className="selected-file-size">
                                     {formatFileSize(
                                         selectedFile.size
                                     )}
                                 </span>
                             </div>
+
                             <button
                                 type="button"
                                 onClick={
@@ -1035,6 +1224,7 @@ export default function Chat() {
                             </button>
                         </div>
                     )}
+
                     {isRecording && (
                         <div className="recording-panel">
                             <span>
@@ -1043,6 +1233,7 @@ export default function Chat() {
                                     recordingTime
                                 )}
                             </span>
+
                             <button
                                 type="button"
                                 onClick={
@@ -1053,6 +1244,7 @@ export default function Chat() {
                             </button>
                         </div>
                     )}
+
                     <div className="chat-input-row">
                         <div className="attachment-buttons">
                             <button
@@ -1064,6 +1256,7 @@ export default function Chat() {
                             >
                                 Фото
                             </button>
+
                             <button
                                 type="button"
                                 className="attachment-button"
@@ -1073,6 +1266,7 @@ export default function Chat() {
                             >
                                 Видео
                             </button>
+
                             <button
                                 type="button"
                                 className="attachment-button"
@@ -1082,6 +1276,7 @@ export default function Chat() {
                             >
                                 Файл
                             </button>
+
                             {!isRecording ? (
                                 <button
                                     type="button"
@@ -1104,6 +1299,7 @@ export default function Chat() {
                                 </button>
                             )}
                         </div>
+
                         <input
                             className="message-input"
                             placeholder="Напишите сообщение..."
@@ -1117,6 +1313,7 @@ export default function Chat() {
                                 handleKeyDown
                             }
                         />
+
                         <button
                             type="button"
                             className="send-button"
@@ -1136,12 +1333,14 @@ export default function Chat() {
                                 : 'Отправить'}
                         </button>
                     </div>
+
                     {error && (
                         <div className="chat-error">
                             {error}
                         </div>
                     )}
                 </section>
+
                 {isGroupChat && (
                     <aside className="chat-sidebar">
                         <div className="sidebar-section">
@@ -1149,18 +1348,22 @@ export default function Chat() {
                                 <h3>
                                     Участники
                                 </h3>
+
                                 <span>
                                     {participants.length}
                                 </span>
                             </div>
+
                             <div className="participants-list">
                                 {participants.map(
                                     (participant) => {
                                         const userId =
                                             participant.user?.id
+
                                         const isCurrent =
                                             userId ===
                                             currentUserId
+
                                         return (
                                             <div
                                                 key={
@@ -1174,12 +1377,14 @@ export default function Chat() {
                                                             participant.user?.phone_number ||
                                                             participant.user_id}
                                                     </span>
+
                                                     {isCurrent && (
                                                         <span className="participant-current">
                                                             Вы
                                                         </span>
                                                     )}
                                                 </div>
+
                                                 {isOwner &&
                                                 !isCurrent &&
                                                 userId && (
@@ -1201,11 +1406,13 @@ export default function Chat() {
                                 )}
                             </div>
                         </div>
+
                         {isOwner && (
                             <div className="sidebar-section">
                                 <h3>
                                     Добавить участника
                                 </h3>
+
                                 <div className="participant-add">
                                     <input
                                         placeholder="Номер телефона"
@@ -1226,6 +1433,7 @@ export default function Chat() {
                                             }
                                         }}
                                     />
+
                                     <button
                                         type="button"
                                         onClick={
@@ -1240,6 +1448,7 @@ export default function Chat() {
                                 </div>
                             </div>
                         )}
+
                         <div className="sidebar-actions">
                             <button
                                 type="button"

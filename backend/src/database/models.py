@@ -138,8 +138,8 @@ class Message(Base):
 
     sent_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False
+        nullable=False,
+        server_default=func.now()
     )
 
     edited_at: Mapped[datetime.datetime | None] = mapped_column(

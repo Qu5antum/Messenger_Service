@@ -62,6 +62,8 @@ class MessageService:
 
         message_type = MessageType.TEXT
 
+        file_key: str | None = None
+
         if file:
             message_type = self._get_message_type(
                 file.content_type

@@ -2,7 +2,7 @@
 
 Revision ID: 0001
 Revises: 
-Create Date: 2026-08-26 21:22:06.549462
+Create Date: 2026-08-27 19:31:48.632238
 
 """
 from typing import Sequence, Union
@@ -29,8 +29,8 @@ def upgrade() -> None:
     sa.Column('role', sa.Enum('USER', 'ADMIN', name='userrole'), nullable=False),
     sa.Column('password', sa.String(), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('phone_number')
     )
@@ -42,8 +42,8 @@ def upgrade() -> None:
     sa.Column('description', sa.String(), nullable=True),
     sa.Column('owner_id', sa.UUID(), nullable=True),
     sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['owner_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
@@ -52,8 +52,8 @@ def upgrade() -> None:
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('joined_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['chat_id'], ['chats.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
@@ -64,11 +64,11 @@ def upgrade() -> None:
     sa.Column('sender_id', sa.UUID(), nullable=False),
     sa.Column('text', sa.String(), nullable=True),
     sa.Column('message_type', sa.Enum('text', 'image', 'video', 'voice', 'file', name='messagetype'), server_default='text', nullable=False),
-    sa.Column('sent_at', sa.DateTime(timezone=True), nullable=False),
-    sa.Column('edited_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('sent_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('edited_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('id', sa.UUID(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['chat_id'], ['chats.id'], ),
     sa.ForeignKeyConstraint(['sender_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -76,7 +76,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_messages_chat_id'), 'messages', ['chat_id'], unique=False)
     op.create_index(op.f('ix_messages_message_type'), 'messages', ['message_type'], unique=False)
     op.create_index(op.f('ix_messages_sender_id'), 'messages', ['sender_id'], unique=False)
-    op.create_index(op.f('ix_messages_sent_at'), 'messages', ['sent_at'], unique=False)
     op.create_table('message_attachments',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('message_id', sa.UUID(), nullable=False),
@@ -85,8 +84,8 @@ def upgrade() -> None:
     sa.Column('mime_type', sa.String(), nullable=False),
     sa.Column('size', sa.Integer(), nullable=False),
     sa.Column('duration', sa.Float(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['message_id'], ['messages.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('file_key')
@@ -100,7 +99,6 @@ def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_index(op.f('ix_message_attachments_message_id'), table_name='message_attachments')
     op.drop_table('message_attachments')
-    op.drop_index(op.f('ix_messages_sent_at'), table_name='messages')
     op.drop_index(op.f('ix_messages_sender_id'), table_name='messages')
     op.drop_index(op.f('ix_messages_message_type'), table_name='messages')
     op.drop_index(op.f('ix_messages_chat_id'), table_name='messages')
