@@ -138,14 +138,14 @@ class Message(Base):
 
     sent_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.datetime.now(datetime.UTC),
-        index=True
+        server_default=func.now(),
+        nullable=False
     )
 
-    edited_at: Mapped[datetime.datetime] = mapped_column(
+    edited_at: Mapped[datetime.datetime | None] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now()
+        nullable=True,
+        default=None
     )
 
 class MessageAttachment(Base):

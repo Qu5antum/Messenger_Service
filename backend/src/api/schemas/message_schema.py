@@ -17,7 +17,7 @@ class MessageResponse(BaseModel):
 	sender_id: UUID
 	text: str | None
 	sent_at: datetime
-	edited_at: datetime
+	edited_at: datetime | None
 	sender: UserOut
 	attachments: list[MessageAttachmentResponse]
 

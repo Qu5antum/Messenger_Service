@@ -3,6 +3,7 @@ import uuid
 import logging
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import UploadFile
+from datetime import datetime, timezone
 
 from src.database.db import AsyncSession
 from src.database.models import User, MessageType
@@ -184,6 +185,10 @@ class MessageService:
 
         try:
             data = message_update.model_dump(exclude_unset=True)
+
+            message.edited_at = datetime.now(
+                timezone.utc
+            )
 
             updated_message = await self.message_repo.update(
                 id=message_id,

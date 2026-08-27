@@ -12,6 +12,7 @@ from src.exception_handlers.user_exceptions import UserNotFoundException, UserAl
 from src.exception_handlers.db_exception import DatabaseException
 from src.api.schemas.chat_schema import ChatParticipantResponse
 from .helper import Helper
+from .file_service import FileService
 
 logger = logging.getLogger("chat_participant")
 
@@ -23,6 +24,7 @@ class ChatParticipantService:
 		self.chat_repo = ChatRepository(session=self.session, user_repo=self.user_repo)
 		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 		self.helper = Helper(session=self.session)
+		self.file_service = FileService()
 
 	async def add_participant_to_group_chat(self, chatId: UUID, phone_number: str, current_user: User) -> dict[str, str]:
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
@@ -202,46 +204,50 @@ class ChatParticipantService:
 		return participants
 
 	async def leave_chat(self, chatId: UUID, current_user: User) -> dict[str, str]: 
-		chat = await self.helper.get_chat_or_404(chatId=chatId)
-
-		is_participant = await self.helper.get_participant_or_400(userId=current_user.id, chatId=chatId)
-
-		if chat.owner_id == current_user.id:
-			chat_participants = await self.chat_participant_repo.get_participants(chatId=chatId)
-
-			if len(chat_participants) == 1:
-				await self.chat_participant_repo.delete(id=is_participant.id)
-				
-				logger.info(
-					"Owner deleted from chat",
-					extra={
-						"user_id": str(current_user.id),
-						"chat_id": str(chatId)
-					}
-				)
-
-				await self.chat_repo.delete(id=chat.id)
-
-				logger.info(
-					"Chat group is empty, chat deleted",
-					extra={
-						"user_id": str(current_user.id),
-						"chat_id": str(chatId)
-					}
-				)
-
-				return {"detail": "User successfully leaved from chat"}
-
-			logger.warning(
-				"Owner can't leave chat if chat has participants",
-				extra={
-					"user_id": str(current_user.id),
-					"chat_id": str(chatId)
-				}
-			)
-
-			raise OwnerCantLeaveChatException("Owner can't leave chat, if chat has participants, make owner another user or remove every user from chat")
 		try:
+			chat = await self.helper.get_chat_or_404(chatId=chatId)
+
+			is_participant = await self.helper.get_participant_or_400(userId=current_user.id, chatId=chatId)
+
+			if chat.owner_id == current_user.id:
+				chat_participants = await self.chat_participant_repo.get_participants(chatId=chatId)
+
+				if len(chat_participants) == 1:
+					await self.chat_participant_repo.delete(id=is_participant.id)
+					
+					logger.info(
+						"Owner deleted from chat",
+						extra={
+							"user_id": str(current_user.id),
+							"chat_id": str(chatId)
+						}
+					)
+
+					if chat.chat_avatar_url:
+						await self.file_service.delete_file(file_key=chat.chat_avatar_url)
+
+					await self.chat_repo.delete(id=chat.id)
+
+					logger.info(
+						"Chat group is empty, chat deleted",
+						extra={
+							"user_id": str(current_user.id),
+							"chat_id": str(chatId)
+						}
+					)
+
+					return {"detail": "User successfully leaved from chat"}
+
+				logger.warning(
+					"Owner can't leave chat if chat has participants",
+					extra={
+						"user_id": str(current_user.id),
+						"chat_id": str(chatId)
+					}
+				)
+
+				raise OwnerCantLeaveChatException("Owner can't leave chat, if chat has participants, make owner another user or remove every user from chat")
+
 			await self.chat_participant_repo.delete(id=is_participant.id)
 
 			logger.info(
@@ -281,4 +287,3 @@ class ChatParticipantService:
 			)
 
 			raise DatabaseException("Database error, pariticpant not removed")
-

@@ -1,6 +1,16 @@
-import { useEffect, useState } from 'react'
-import type { ChangeEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import {
+    useEffect,
+    useRef,
+    useState,
+} from 'react'
+import type {
+    ChangeEvent,
+} from 'react'
+import {
+    Link,
+    useNavigate,
+    useParams,
+} from 'react-router-dom'
 import {
     getChats,
     getChatAvatar,
@@ -12,13 +22,13 @@ import {
 
 type Chat = {
     id: string
-    title?: string
+    title?: string | null
     avatar?: string
-    description?: string
-    owner_id?: string
+    description?: string | null
+    owner_id?: string | null
     is_group?: boolean
-    last_message?: string
-    last_message_time?: string
+    last_message?: string | null
+    last_message_time?: string | null
 }
 
 type ChatUpdate = {
@@ -36,47 +46,91 @@ export default function ChatsList() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    const [editingChatId, setEditingChatId] = useState<string | null>(null)
+    const [editingChatId, setEditingChatId] =
+        useState<string | null>(null)
     const [editingTitle, setEditingTitle] = useState('')
-    const [editingDescription, setEditingDescription] = useState('')
-    const [editingFile, setEditingFile] = useState<File | null>(null)
-    const [editingPreview, setEditingPreview] = useState<string | null>(null)
-    const [editingLoading, setEditingLoading] = useState(false)
+    const [editingDescription, setEditingDescription] =
+        useState('')
+    const [editingFile, setEditingFile] =
+        useState<File | null>(null)
+    const [editingPreview, setEditingPreview] =
+        useState<string | null>(null)
+    const [editingLoading, setEditingLoading] =
+        useState(false)
 
-    const [deletingChatId, setDeletingChatId] = useState<string | null>(null)
+    const [deletingChatId, setDeletingChatId] =
+        useState<string | null>(null)
 
     const navigate = useNavigate()
     const { chatId } = useParams()
-    const currentUserId = localStorage.getItem('user_id') || ''
 
-    const loadChatAvatars = async (chatList: Chat[]) => {
+    const currentUserId =
+        localStorage.getItem('user_id') || ''
+
+    const avatarUrlsRef = useRef<Set<string>>(
+        new Set()
+    )
+
+    const revokeAvatarUrl = (
+        url?: string | null
+    ) => {
+        if (
+            url &&
+            url.startsWith('blob:')
+        ) {
+            URL.revokeObjectURL(url)
+            avatarUrlsRef.current.delete(url)
+        }
+    }
+
+    const getChatName = (
+        chat: Chat
+    ) => {
+        if (chat.title?.trim()) {
+            return chat.title
+        }
+
+        return chat.is_group
+            ? 'Группа'
+            : 'Личный чат'
+    }
+
+    const loadChatAvatar = async (
+        chat: Chat
+    ): Promise<Chat> => {
+        try {
+            const avatar = await getChatAvatar(
+                chat.id
+            )
+
+            avatarUrlsRef.current.add(avatar)
+
+            return {
+                ...chat,
+                avatar,
+            }
+        } catch (e) {
+            return {
+                ...chat,
+                avatar: undefined,
+            }
+        }
+    }
+
+    const loadChatAvatars = async (
+        chatList: Chat[]
+    ) => {
         const updatedChats = await Promise.all(
-            chatList.map(async (chat) => {
-                if (!chat.is_group) {
-                    return chat
-                }
-
-                try {
-                    const avatar = await getChatAvatar(chat.id)
-
-                    return {
-                        ...chat,
-                        avatar,
-                    }
-                } catch {
-                    return chat
-                }
-            })
+            chatList.map(loadChatAvatar)
         )
 
         setChats(updatedChats)
     }
 
     const load = async () => {
-        setError(null)
-
         try {
             setLoading(true)
+            setError(null)
 
             const data = await getChats()
 
@@ -100,52 +154,48 @@ export default function ChatsList() {
         load()
 
         return () => {
-            chats.forEach((chat) => {
-                if (chat.avatar?.startsWith('blob:')) {
-                    URL.revokeObjectURL(chat.avatar)
+            avatarUrlsRef.current.forEach(
+                (url) => {
+                    URL.revokeObjectURL(url)
                 }
-            })
+            )
+
+            avatarUrlsRef.current.clear()
         }
     }, [])
 
     const createGroup = async () => {
         const groupTitle = title.trim()
 
-        setError(null)
-
         if (!groupTitle) {
-            setError('Введите название группы')
+            setError(
+                'Введите название группы'
+            )
             return
         }
 
         try {
             setLoading(true)
+            setError(null)
 
-            const res = await createGroupChat({
-                title: groupTitle,
-            })
+            const response =
+                await createGroupChat({
+                    title: groupTitle,
+                })
 
             setTitle('')
 
-            let newChat: Chat = res
-
-            if (newChat.is_group) {
-                try {
-                    newChat = {
-                        ...newChat,
-                        avatar: await getChatAvatar(newChat.id),
-                    }
-                } catch {
-                    // У группы может не быть аватара
-                }
-            }
+            const newChat =
+                await loadChatAvatar(response)
 
             setChats((prev) => [
                 newChat,
                 ...prev,
             ])
 
-            navigate(`/chat/${newChat.id}`)
+            navigate(
+                `/chat/${newChat.id}`
+            )
         } catch (e: any) {
             console.error(e)
 
@@ -164,26 +214,35 @@ export default function ChatsList() {
     const createPrivate = async () => {
         const userPhone = phone.trim()
 
-        setError(null)
-
         if (!userPhone) {
-            setError('Введите номер телефона')
+            setError(
+                'Введите номер телефона'
+            )
             return
         }
 
         try {
             setLoading(true)
+            setError(null)
 
-            const res = await createPrivateChat(userPhone)
+            const response =
+                await createPrivateChat(
+                    userPhone
+                )
 
             setPhone('')
 
+            const newChat =
+                await loadChatAvatar(response)
+
             setChats((prev) => [
-                res,
+                newChat,
                 ...prev,
             ])
 
-            navigate(`/chat/${res.id}`)
+            navigate(
+                `/chat/${newChat.id}`
+            )
         } catch (e: any) {
             console.error(e)
 
@@ -199,7 +258,9 @@ export default function ChatsList() {
         }
     }
 
-    const handleStartEdit = (chat: Chat) => {
+    const handleStartEdit = (
+        chat: Chat
+    ) => {
         if (
             !chat.is_group ||
             chat.owner_id !== currentUserId
@@ -209,17 +270,34 @@ export default function ChatsList() {
 
         setEditingChatId(chat.id)
         setEditingTitle(chat.title || '')
-        setEditingDescription(chat.description || '')
+        setEditingDescription(
+            chat.description || ''
+        )
         setEditingFile(null)
-        setEditingPreview(chat.avatar || null)
+
+        /*
+        Не добавляем chat.avatar в avatarUrlsRef повторно.
+        Это существующий blob URL группы.
+        */
+        setEditingPreview(
+            chat.avatar || null
+        )
+
         setError(null)
     }
 
     const handleCancelEdit = () => {
         if (
-            editingPreview?.startsWith('blob:')
+            editingPreview?.startsWith('blob:') &&
+            editingPreview !==
+                chats.find(
+                    (chat) =>
+                        chat.id === editingChatId
+                )?.avatar
         ) {
-            URL.revokeObjectURL(editingPreview)
+            revokeAvatarUrl(
+                editingPreview
+            )
         }
 
         setEditingChatId(null)
@@ -238,23 +316,55 @@ export default function ChatsList() {
             return
         }
 
-        if (!file.type.startsWith('image/')) {
-            setError('Можно выбрать только изображение')
+        if (
+            !file.type.startsWith(
+                'image/'
+            )
+        ) {
+            setError(
+                'Можно выбрать только изображение'
+            )
             return
         }
 
-        if (file.size > 5 * 1024 * 1024) {
-            setError('Размер изображения не должен превышать 5 МБ')
+        if (
+            file.size >
+            5 * 1024 * 1024
+        ) {
+            setError(
+                'Размер изображения не должен превышать 5 МБ'
+            )
             return
         }
 
-        if (editingPreview?.startsWith('blob:')) {
-            URL.revokeObjectURL(editingPreview)
+        /*
+        Если до этого пользователь уже выбрал
+        новое изображение, удаляем только его preview.
+        */
+        const currentChat =
+            chats.find(
+                (chat) =>
+                    chat.id === editingChatId
+            )
+
+        if (
+            editingPreview?.startsWith('blob:') &&
+            editingPreview !==
+                currentChat?.avatar
+        ) {
+            URL.revokeObjectURL(
+                editingPreview
+            )
         }
+
+        const preview =
+            URL.createObjectURL(file)
 
         setEditingFile(file)
-        setEditingPreview(URL.createObjectURL(file))
+        setEditingPreview(preview)
         setError(null)
+
+        e.target.value = ''
     }
 
     const handleSaveEdit = async () => {
@@ -263,7 +373,8 @@ export default function ChatsList() {
         }
 
         const chat = chats.find(
-            (item) => item.id === editingChatId
+            (item) =>
+                item.id === editingChatId
         )
 
         if (!chat) {
@@ -274,21 +385,29 @@ export default function ChatsList() {
             !chat.is_group ||
             chat.owner_id !== currentUserId
         ) {
-            setError('Только владелец может изменить чат')
+            setError(
+                'Только владелец может изменить чат'
+            )
             return
         }
 
-        const newTitle = editingTitle.trim()
-        const newDescription = editingDescription.trim()
+        const newTitle =
+            editingTitle.trim()
+
+        const newDescription =
+            editingDescription.trim()
 
         if (!newTitle) {
-            setError('Название группы не может быть пустым')
+            setError(
+                'Название группы не может быть пустым'
+            )
             return
         }
 
         const data: ChatUpdate = {
             title: newTitle,
-            description: newDescription || undefined,
+            description:
+                newDescription || undefined,
             file: editingFile,
         }
 
@@ -296,28 +415,51 @@ export default function ChatsList() {
             setEditingLoading(true)
             setError(null)
 
-            const updatedChat = await updateChat(
-                editingChatId,
-                data
-            )
+            const updatedChat =
+                await updateChat(
+                    editingChatId,
+                    data
+                )
 
-            let newAvatar = chat.avatar
+            let newAvatar =
+                chat.avatar
 
             if (editingFile) {
                 try {
-                    newAvatar = await getChatAvatar(
-                        editingChatId
+                    const avatar =
+                        await getChatAvatar(
+                            editingChatId
+                        )
+
+                    avatarUrlsRef.current.add(
+                        avatar
+                    )
+
+                    newAvatar = avatar
+
+                    revokeAvatarUrl(
+                        chat.avatar
                     )
                 } catch {
                     newAvatar = undefined
                 }
             }
 
+            /*
+            Удаляем временный preview,
+            если он не является реальным
+            avatar чата.
+            */
             if (
-                chat.avatar?.startsWith('blob:') &&
-                chat.avatar !== newAvatar
+                editingPreview?.startsWith(
+                    'blob:'
+                ) &&
+                editingPreview !== chat.avatar &&
+                editingPreview !== newAvatar
             ) {
-                URL.revokeObjectURL(chat.avatar)
+                URL.revokeObjectURL(
+                    editingPreview
+                )
             }
 
             setChats((prev) =>
@@ -332,7 +474,11 @@ export default function ChatsList() {
                 )
             )
 
-            handleCancelEdit()
+            setEditingChatId(null)
+            setEditingTitle('')
+            setEditingDescription('')
+            setEditingFile(null)
+            setEditingPreview(null)
         } catch (e: any) {
             console.error(e)
 
@@ -348,18 +494,23 @@ export default function ChatsList() {
         }
     }
 
-    const handleDelete = async (chat: Chat) => {
+    const handleDelete = async (
+        chat: Chat
+    ) => {
         if (
             !chat.is_group ||
             chat.owner_id !== currentUserId
         ) {
-            setError('Только владелец может удалить чат')
+            setError(
+                'Только владелец может удалить чат'
+            )
             return
         }
 
-        const confirmed = window.confirm(
-            `Удалить группу "${chat.title || 'Группа'}"?\n\nВсе сообщения и данные группы будут удалены.`
-        )
+        const confirmed =
+            window.confirm(
+                `Удалить группу "${getChatName(chat)}"?\n\nВсе сообщения и данные группы будут удалены.`
+            )
 
         if (!confirmed) {
             return
@@ -371,13 +522,14 @@ export default function ChatsList() {
 
             await deleteChat(chat.id)
 
-            if (chat.avatar?.startsWith('blob:')) {
-                URL.revokeObjectURL(chat.avatar)
-            }
+            revokeAvatarUrl(
+                chat.avatar
+            )
 
             setChats((prev) =>
                 prev.filter(
-                    (item) => item.id !== chat.id
+                    (item) =>
+                        item.id !== chat.id
                 )
             )
 
@@ -402,19 +554,18 @@ export default function ChatsList() {
         }
     }
 
-    const filteredChats = chats.filter((chat) => {
-        const name =
-            chat.title ||
-            (
-                chat.is_group
-                    ? 'Группа'
-                    : 'Личный чат'
-            )
+    const filteredChats =
+        chats.filter((chat) => {
+            const name =
+                getChatName(chat)
 
-        return name
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase())
-    })
+            return name
+                .toLowerCase()
+                .includes(
+                    searchQuery
+                        .toLowerCase()
+                )
+        })
 
     return (
         <div
@@ -432,6 +583,7 @@ export default function ChatsList() {
                     <span className="profile-icon">
                         👤
                     </span>
+
                     <span>
                         Мой профиль
                     </span>
@@ -443,6 +595,7 @@ export default function ChatsList() {
                     <span className="search-icon">
                         🔍
                     </span>
+
                     <input
                         type="text"
                         placeholder="Поиск чатов..."
@@ -482,7 +635,9 @@ export default function ChatsList() {
                             )
                         }
                         onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                            if (
+                                e.key === 'Enter'
+                            ) {
                                 createGroup()
                             }
                         }}
@@ -490,7 +645,9 @@ export default function ChatsList() {
                             paddingLeft: '10px',
                         }}
                     />
+
                     <button
+                        type="button"
                         className="btn-primary"
                         onClick={createGroup}
                         disabled={
@@ -522,7 +679,9 @@ export default function ChatsList() {
                             )
                         }
                         onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                            if (
+                                e.key === 'Enter'
+                            ) {
                                 createPrivate()
                             }
                         }}
@@ -530,9 +689,13 @@ export default function ChatsList() {
                             paddingLeft: '10px',
                         }}
                     />
+
                     <button
+                        type="button"
                         className="btn-primary"
-                        onClick={createPrivate}
+                        onClick={
+                            createPrivate
+                        }
                         disabled={
                             loading ||
                             !phone.trim()
@@ -549,9 +712,12 @@ export default function ChatsList() {
                 {error && (
                     <div
                         style={{
-                            color: 'var(--danger)',
-                            fontSize: '0.8rem',
-                            marginTop: '4px',
+                            color:
+                                'var(--danger)',
+                            fontSize:
+                                '0.8rem',
+                            marginTop:
+                                '4px',
                         }}
                     >
                         {error}
@@ -560,13 +726,16 @@ export default function ChatsList() {
             </div>
 
             <div className="chats-list">
-                {loading && chats.length === 0 ? (
+                {loading &&
+                chats.length === 0 ? (
                     <div
                         style={{
                             padding: '16px',
                             textAlign: 'center',
-                            color: 'var(--muted)',
-                            fontSize: '0.88rem',
+                            color:
+                                'var(--muted)',
+                            fontSize:
+                                '0.88rem',
                         }}
                     >
                         Загрузка чатов...
@@ -576,265 +745,340 @@ export default function ChatsList() {
                         style={{
                             padding: '16px',
                             textAlign: 'center',
-                            color: 'var(--muted)',
-                            fontSize: '0.88rem',
+                            color:
+                                'var(--muted)',
+                            fontSize:
+                                '0.88rem',
                         }}
                     >
                         Чаты не найдены
                     </div>
                 ) : (
-                    filteredChats.map((chat) => {
-                        const name =
-                            chat.title ||
-                            (
-                                chat.is_group
-                                    ? 'Группа'
-                                    : 'Личный чат'
-                            )
+                    filteredChats.map(
+                        (chat) => {
+                            const name =
+                                getChatName(chat)
 
-                        const isActive =
-                            String(chat.id) ===
-                            String(chatId)
+                            const isActive =
+                                String(
+                                    chat.id
+                                ) ===
+                                String(
+                                    chatId
+                                )
 
-                        const isOwner =
-                            chat.is_group &&
-                            chat.owner_id ===
-                            currentUserId
+                            const isOwner =
+                                chat.is_group &&
+                                chat.owner_id ===
+                                    currentUserId
 
-                        const isEditing =
-                            editingChatId ===
-                            chat.id
+                            const isEditing =
+                                editingChatId ===
+                                chat.id
 
-                        const isDeleting =
-                            deletingChatId ===
-                            chat.id
+                            const isDeleting =
+                                deletingChatId ===
+                                chat.id
 
-                        if (isEditing) {
-                            return (
-                                <div
-                                    key={chat.id}
-                                    className={`chat-item ${isActive ? 'active' : ''}`}
-                                    style={{
-                                        cursor: 'default',
-                                    }}
-                                >
+                            if (
+                                isEditing
+                            ) {
+                                return (
                                     <div
-                                        className="chat-avatar"
+                                        key={
+                                            chat.id
+                                        }
+                                        className={`chat-item ${
+                                            isActive
+                                                ? 'active'
+                                                : ''
+                                        }`}
                                         style={{
-                                            overflow: 'hidden',
+                                            cursor:
+                                                'default',
                                         }}
                                     >
-                                        {editingPreview ? (
-                                            <img
-                                                src={editingPreview}
-                                                alt={name}
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover',
-                                                    borderRadius: '50%',
-                                                }}
-                                            />
-                                        ) : (
-                                            name
-                                                .charAt(0)
-                                                .toUpperCase()
-                                        )}
-                                    </div>
-
-                                    <div
-                                        className="chat-details"
-                                        style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '6px',
-                                        }}
-                                    >
-                                        <input
-                                            value={editingTitle}
-                                            onChange={(e) =>
-                                                setEditingTitle(
-                                                    e.target.value
-                                                )
-                                            }
-                                            placeholder="Название"
-                                            autoFocus
-                                        />
-
-                                        <input
-                                            value={editingDescription}
-                                            onChange={(e) =>
-                                                setEditingDescription(
-                                                    e.target.value
-                                                )
-                                            }
-                                            placeholder="Описание"
-                                        />
-
-                                        <label
+                                        <div
+                                            className="chat-avatar"
                                             style={{
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '4px',
-                                                fontSize: '0.8rem',
+                                                overflow:
+                                                    'hidden',
                                             }}
                                         >
-                                            Фото группы
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={
-                                                    handleFileChange
-                                                }
-                                            />
-                                        </label>
-
-                                        {editingFile && (
-                                            <span
-                                                style={{
-                                                    fontSize: '0.75rem',
-                                                    color: 'var(--muted)',
-                                                }}
-                                            >
-                                                {editingFile.name}
-                                            </span>
-                                        )}
+                                            {editingPreview ? (
+                                                <img
+                                                    src={
+                                                        editingPreview
+                                                    }
+                                                    alt={
+                                                        name
+                                                    }
+                                                    style={{
+                                                        width:
+                                                            '100%',
+                                                        height:
+                                                            '100%',
+                                                        objectFit:
+                                                            'cover',
+                                                        borderRadius:
+                                                            '50%',
+                                                    }}
+                                                />
+                                            ) : (
+                                                name
+                                                    .charAt(
+                                                        0
+                                                    )
+                                                    .toUpperCase()
+                                            )}
+                                        </div>
 
                                         <div
+                                            className="chat-details"
                                             style={{
-                                                display: 'flex',
-                                                gap: '6px',
+                                                display:
+                                                    'flex',
+                                                flexDirection:
+                                                    'column',
+                                                gap:
+                                                    '6px',
                                             }}
                                         >
-                                            <button
-                                                onClick={
-                                                    handleSaveEdit
+                                            <input
+                                                value={
+                                                    editingTitle
                                                 }
-                                                disabled={
-                                                    editingLoading
+                                                onChange={(
+                                                    e
+                                                ) =>
+                                                    setEditingTitle(
+                                                        e
+                                                            .target
+                                                            .value
+                                                    )
                                                 }
-                                                className="btn-primary"
+                                                placeholder="Название"
+                                                autoFocus
+                                            />
+
+                                            <input
+                                                value={
+                                                    editingDescription
+                                                }
+                                                onChange={(
+                                                    e
+                                                ) =>
+                                                    setEditingDescription(
+                                                        e
+                                                            .target
+                                                            .value
+                                                    )
+                                                }
+                                                placeholder="Описание"
+                                            />
+
+                                            <label
+                                                style={{
+                                                    display:
+                                                        'flex',
+                                                    flexDirection:
+                                                        'column',
+                                                    gap:
+                                                        '4px',
+                                                    fontSize:
+                                                        '0.8rem',
+                                                }}
                                             >
-                                                {editingLoading
-                                                    ? 'Сохранение...'
-                                                    : 'Сохранить'}
+                                                Фото группы
+
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={
+                                                        handleFileChange
+                                                    }
+                                                />
+                                            </label>
+
+                                            {editingFile && (
+                                                <span
+                                                    style={{
+                                                        fontSize:
+                                                            '0.75rem',
+                                                        color:
+                                                            'var(--muted)',
+                                                    }}
+                                                >
+                                                    {
+                                                        editingFile.name
+                                                    }
+                                                </span>
+                                            )}
+
+                                            <div
+                                                style={{
+                                                    display:
+                                                        'flex',
+                                                    gap:
+                                                        '6px',
+                                                }}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={
+                                                        handleSaveEdit
+                                                    }
+                                                    disabled={
+                                                        editingLoading
+                                                    }
+                                                    className="btn-primary"
+                                                >
+                                                    {editingLoading
+                                                        ? 'Сохранение...'
+                                                        : 'Сохранить'}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={
+                                                        handleCancelEdit
+                                                    }
+                                                    disabled={
+                                                        editingLoading
+                                                    }
+                                                >
+                                                    Отмена
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            }
+
+                            return (
+                                <div
+                                    key={
+                                        chat.id
+                                    }
+                                    className={`chat-item-wrapper ${
+                                        isActive
+                                            ? 'active'
+                                            : ''
+                                    }`}
+                                >
+                                    <Link
+                                        to={`/chat/${chat.id}`}
+                                        className={`chat-item ${
+                                            isActive
+                                                ? 'active'
+                                                : ''
+                                        }`}
+                                    >
+                                        <div
+                                            className="chat-avatar"
+                                            style={{
+                                                overflow:
+                                                    'hidden',
+                                            }}
+                                        >
+                                            {chat.avatar ? (
+                                                <img
+                                                    src={
+                                                        chat.avatar
+                                                    }
+                                                    alt={
+                                                        name
+                                                    }
+                                                    style={{
+                                                        width:
+                                                            '100%',
+                                                        height:
+                                                            '100%',
+                                                        objectFit:
+                                                            'cover',
+                                                        borderRadius:
+                                                            '50%',
+                                                    }}
+                                                />
+                                            ) : (
+                                                name
+                                                    .charAt(
+                                                        0
+                                                    )
+                                                    .toUpperCase()
+                                            )}
+                                        </div>
+
+                                        <div className="chat-details">
+                                            <div className="chat-top-row">
+                                                <span className="chat-title">
+                                                    {
+                                                        name
+                                                    }
+                                                </span>
+
+                                                <span className="chat-time">
+                                                    {
+                                                        chat.last_message_time ||
+                                                        ''
+                                                    }
+                                                </span>
+                                            </div>
+
+                                            <div className="chat-last-message">
+                                                {chat.last_message ||
+                                                    (
+                                                        chat.is_group
+                                                            ? 'Групповой чат'
+                                                            : 'Личная переписка'
+                                                    )}
+                                            </div>
+                                        </div>
+                                    </Link>
+
+                                    {isOwner && (
+                                        <div
+                                            className="chat-actions"
+                                            onClick={(
+                                                e
+                                            ) =>
+                                                e.stopPropagation()
+                                            }
+                                        >
+                                            <button
+                                                type="button"
+                                                title="Редактировать чат"
+                                                onClick={() =>
+                                                    handleStartEdit(
+                                                        chat
+                                                    )
+                                                }
+                                            >
+                                                ✎
                                             </button>
 
                                             <button
-                                                onClick={
-                                                    handleCancelEdit
+                                                type="button"
+                                                title="Удалить чат"
+                                                onClick={() =>
+                                                    handleDelete(
+                                                        chat
+                                                    )
                                                 }
                                                 disabled={
-                                                    editingLoading
+                                                    isDeleting
                                                 }
                                             >
-                                                Отмена
+                                                {isDeleting
+                                                    ? '...'
+                                                    : '×'}
                                             </button>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )
                         }
-
-                        return (
-                            <div
-                                key={chat.id}
-                                className={`chat-item-wrapper ${isActive ? 'active' : ''}`}
-                            >
-                                <Link
-                                    to={`/chat/${chat.id}`}
-                                    className={`chat-item ${isActive ? 'active' : ''}`}
-                                >
-                                    <div
-                                        className="chat-avatar"
-                                        style={{
-                                            overflow: 'hidden',
-                                        }}
-                                    >
-                                        {chat.avatar ? (
-                                            <img
-                                                src={chat.avatar}
-                                                alt={name}
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover',
-                                                    borderRadius: '50%',
-                                                }}
-                                            />
-                                        ) : (
-                                            name
-                                                .charAt(0)
-                                                .toUpperCase()
-                                        )}
-                                    </div>
-
-                                    <div className="chat-details">
-                                        <div className="chat-top-row">
-                                            <span className="chat-title">
-                                                {name}
-                                            </span>
-                                            <span className="chat-time">
-                                                {
-                                                    chat.last_message_time ||
-                                                    ''
-                                                }
-                                            </span>
-                                        </div>
-
-                                        <div className="chat-last-message">
-                                            {
-                                                chat.last_message ||
-                                                (
-                                                    chat.is_group
-                                                        ? 'Групповой чат'
-                                                        : 'Личная переписка'
-                                                )
-                                            }
-                                        </div>
-                                    </div>
-                                </Link>
-
-                                {isOwner && (
-                                    <div
-                                        className="chat-actions"
-                                        onClick={(e) =>
-                                            e.stopPropagation()
-                                        }
-                                    >
-                                        <button
-                                            type="button"
-                                            title="Редактировать чат"
-                                            onClick={() =>
-                                                handleStartEdit(
-                                                    chat
-                                                )
-                                            }
-                                        >
-                                            ✎
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            title="Удалить чат"
-                                            onClick={() =>
-                                                handleDelete(
-                                                    chat
-                                                )
-                                            }
-                                            disabled={
-                                                isDeleting
-                                            }
-                                        >
-                                            {isDeleting
-                                                ? '...'
-                                                : '×'}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )
-                    })
+                    )
                 )}
             </div>
         </div>
