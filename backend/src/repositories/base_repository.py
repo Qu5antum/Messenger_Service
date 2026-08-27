@@ -75,9 +75,16 @@ class BaseRepository(AbstractRepository):
             raise
 
     async def delete(self, id: UUID):
-        obj = await self.session.get(self.model, id)
+        try:
+            obj = await self.session.get(self.model, id)
 
-        await self.session.delete(obj)
-        await self.session.commit()
+            if not obj:
+                return None
 
-        return obj
+            await self.session.delete(obj)
+            await self.session.commit()
+
+            return obj
+        
+        except:
+            raise

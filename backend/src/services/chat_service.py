@@ -181,7 +181,7 @@ class ChatService:
 		await self.helper.get_owner_or_403(ownerId=user.id, chatId=chatId)
 
 		try:
-			data = chatUpdate.model_dump(exclude_unset=True)
+			data = chatUpdate.model_dump(exclude_unset=True, exclude_none=True)
 
 			if chat.chat_avatar_url and file:
 				await self.file_service.delete_file(file_key=chat.chat_avatar_url)
@@ -235,8 +235,11 @@ class ChatService:
 			)
 
 			raise ChatIsNotGroupException("Chat is private you can't delete it")
-
+		
 		await self.helper.get_owner_or_403(ownerId=user.id, chatId=chatId)
+
+		if chat.chat_avatar_url:
+			await self.file_service.delete_file(file_key=chat.chat_avatar_url)
 
 		await self.chat_repo.delete(id=chatId)
 
@@ -248,16 +251,41 @@ class ChatService:
 		return {"detail": "Chat successfully deleted"}
 
 	async def delete_chat_for_admin(self, chatId: UUID) -> dict[str, str]:
-		await self.helper.get_chat_or_404(chatId=chatId)
+		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
-		await self.chat_repo.delete(id=chatId)
+		if chat.chat_avatar_url:
+			await self.file_service.delete_file(file_key=chat.chat_avatar_url)
+		try:
+			await self.chat_repo.delete(id=chatId)
 
-		logger.info(
-			"Chat successfully deleted",
-			extra={"chat_id": str(chatId)}
-		)
+			logger.info(
+				"Chat successfully deleted",
+				extra={"chat_id": str(chatId)}
+			)
 
-		return {"detail": "Chat successfully deleted"}
+			return {"detail": "Chat successfully deleted"}
+
+		except IntegrityError as e:
+			await self.session.rollback()
+
+			logger.error(
+				f"Database error, chat not deleted: {e}",
+				exc_info=True,
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise DatabaseException("Database error, chat not deleted")
+
+		except SQLAlchemyError as e:
+			await self.session.rollback()
+
+			logger.error(
+				f"Database error, chat not deleted: {e}",
+				exc_info=True,
+				extra={"chat_id": str(chatId)}
+			)
+
+			raise DatabaseException("Database error, chat not deleted")
 
 	async def get_chat_by_id(self, chatId: UUID, user: User) -> ChatResponse: 
 		# implement redis service

@@ -1,6 +1,6 @@
 import logging
 from uuid import UUID
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from src.database.db import AsyncSession
 from src.database.models import User
@@ -79,26 +79,38 @@ class ChatParticipantService:
 
 			await self.session.commit()
 
-		except IntegrityError:
+			logger.info(
+				"New participant added to the chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(user.id)
+				}
+			)
+	
+			return {"detail": "New participant added to the chat"}
+
+		except IntegrityError as e:
 			await self.session.rollback()
 
 			logger.error(
-				"Database error, new participant not created",
+				f"Database error, new participant not created: {e}",
 				exc_info=True,
 				extra={"user_id": str(user.id)}
 			)
 
 			raise DatabaseException("Participant not added in chat")
 
-		logger.info(
-			"New participant added to the chat",
-			extra={
-				"chat_id": str(chatId),
-				"user_id": str(user.id)
-			}
-		)
+		except SQLAlchemyError as e:
+			await self.session.rollback()
 
-		return {"detail": "New participant added to the chat"}
+			logger.error(
+				f"Database error, new participant not created: {e}",
+				exc_info=True,
+				extra={"user_id": str(user.id)}
+			)
+
+			raise DatabaseException("Participant not added in chat")
+
 
 	async def remove_participant_from_chat(self, chatId: UUID, userId: UUID, current_user: User) -> dict[str, str]:
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
@@ -125,17 +137,46 @@ class ChatParticipantService:
 
 		await self.helper.get_owner_or_403(ownerId=current_user.id, chatId=chatId)
 
-		await self.chat_participant_repo.delete(id=is_participant.id)
+		try:
+			await self.chat_participant_repo.delete(id=is_participant.id)
 
-		logger.info(
-			"User successfully removed from the chat",
-			extra={
-				"chat_id": str(chatId),
-				"user_id": str(current_user.id)
-			}
-		)
+			logger.info(
+				"User successfully removed from the chat",
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
 
-		return {"detail": "User removed from the chat"}
+			return {"detail": "User removed from the chat"}
+
+		except IntegrityError as e:
+			await self.session.rollback()
+
+			logger.error(
+				f"Database error, participant not removed: {e}",
+				exc_info=True,
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
+
+			raise DatabaseException("Database error, pariticpant not removed")
+
+		except SQLAlchemyError as e:
+			await self.session.rollback()
+
+			logger.error(
+				f"Database error, participant not removed: {e}",
+				exc_info=True,
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
+
+			raise DatabaseException("Database error, pariticpant not removed")
 
 	async def get_participants_on_group_chat(self, chatId: UUID, user: User) -> list[ChatParticipantResponse]:
 		# implement redis service
@@ -200,15 +241,44 @@ class ChatParticipantService:
 			)
 
 			raise OwnerCantLeaveChatException("Owner can't leave chat, if chat has participants, make owner another user or remove every user from chat")
+		try:
+			await self.chat_participant_repo.delete(id=is_participant.id)
 
-		await self.chat_participant_repo.delete(id=is_participant.id)
+			logger.info(
+				"Successfully removed from chat",
+				extra={
+					"user_id": str(current_user.id),
+					"chat_id": str(chatId)
+				}
+			)
 
-		logger.info(
-			"Successfully removed from chat",
-			extra={
-				"user_id": str(current_user.id),
-				"chat_id": str(chatId)
-			}
-		)
+			return {"detail": "User successfully leaved from chat"}
 
-		return {"detail": "User successfully leaved from chat"}
+		except IntegrityError as e:
+			await self.session.rollback()
+			
+			logger.error(
+				f"Database error, participant not removed: {e}",
+				exc_info=True,
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
+
+			raise DatabaseException("Database error, pariticpant not removed")
+
+		except SQLAlchemyError as e:
+			await self.session.rollback()
+			
+			logger.error(
+				f"Database error, participant not removed: {e}",
+				exc_info=True,
+				extra={
+					"chat_id": str(chatId),
+					"user_id": str(current_user.id)
+				}
+			)
+
+			raise DatabaseException("Database error, pariticpant not removed")
+

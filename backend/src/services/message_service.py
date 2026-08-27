@@ -233,17 +233,49 @@ class MessageService:
             raise MessageNotFoundException("Message not found")
 
         await self.attachment_service.delete_files_in_attachments(message_id=message_id)
-        await self.message_repo.delete(id=message_id)
 
-        logger.info(
-            "Message successfully deleted",
-            extra={
-                "message_id": str(message_id),
-                "user_id": str(sender_id)
-            }
-        )
+        try:
+            await self.message_repo.delete(id=message_id)
 
-        return {"detail": "Message deleted"}
+            logger.info(
+                "Message successfully deleted",
+                extra={
+                    "message_id": str(message_id),
+                    "user_id": str(sender_id)
+                }
+            )
+
+            return {"detail": "Message deleted"}
+
+        except IntegrityError as e:
+            await self.session.rollback()
+
+            logger.error(
+                f"Database error, message not deleted: {e}",
+                exc_info=True,
+                extra={
+                    "chat_id": str(chat_id),
+                    "sender_id": str(sender_id),
+                    "message_id": str(message_id)
+                }
+            )
+
+            raise DatabaseException("Database error, message not deleted")
+
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            
+            logger.error(
+                f"Database error, message not deleted: {e}",
+                exc_info=True,
+                extra={
+                    "chat_id": str(chat_id),
+                    "sender_id": str(sender_id),
+                    "message_id": str(message_id)
+                }
+            )
+
+            raise DatabaseException("Database error, message not deleted")
 
     async def get_messages_in_chat(self, chatId: UUID, user: User) -> list[MessageResponse]:
         await self.helper.get_chat_or_404(chatId=chatId)
