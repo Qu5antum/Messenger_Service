@@ -297,6 +297,9 @@ class ChatService:
 
 		await self.helper.get_participant_or_400(chatId=chat_id, userId=user_id)
 
+		if not chat.is_group:
+			chat = await self.chat_repo.change_private_chat_avatar(chat_id=chat.id, current_user_id=user_id)
+
 		if not chat.chat_avatar_url:
 			logger.warning("Avatar file not found")
 

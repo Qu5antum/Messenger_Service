@@ -76,3 +76,26 @@ class ChatRepository(BaseRepository):
 				chat.title = username
 
 		return chats
+
+	async def change_private_chat_avatar(self, chat_id: UUID, current_user_id: UUID):
+		result = await self.session.execute(
+			select(self.model)
+			.options(selectinload(self.model.chat_participants))
+			.where(self.model.id==chat_id)
+		)
+
+		chat = result.scalar_one_or_none()
+
+		if not chat.is_group:
+			other_participant = next(
+				p for p in chat.chat_participants
+				if p.user_id != current_user_id
+			)
+
+			user_avatar_url = await self.user_repo.get_user_avatar_url_by_id(
+				user_id=other_participant.user_id
+			)
+
+			chat.chat_avatar_url = user_avatar_url
+
+		return chat

@@ -3,7 +3,6 @@ import api from './client'
 export const getMessages = (chatId: string) =>
     api.get(`/api/chat/${chatId}/messages`).then((r) => r.data)
 
-
 export const sendMessage = (
     chatId: string,
     text?: string,
@@ -14,9 +13,7 @@ export const sendMessage = (
     if (text?.trim()) {
         formData.append(
             'message',
-            JSON.stringify({
-                text: text.trim(),
-            })
+            text.trim()
         )
     }
 
@@ -34,7 +31,6 @@ export const sendMessage = (
         )
         .then((r) => r.data)
 }
-
 
 export const editMessage = (
     chatId: string,

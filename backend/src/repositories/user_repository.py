@@ -38,3 +38,10 @@ class UserRepository(BaseRepository):
 
         return result.scalar_one_or_none()
 
+    async def get_user_avatar_url_by_id(self, user_id: UUID):
+        result = await self.session.execute(
+            select(self.model.avatar_url)
+            .where(self.model.id==user_id)
+        )
+
+        return result.scalar_one_or_none()
