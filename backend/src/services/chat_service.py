@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
 from pathlib import Path
+import json
 
 from src.database.db import AsyncSession
 from src.database.models import User
@@ -17,18 +18,20 @@ from src.exception_handlers.db_exception import DatabaseException
 from src.exception_handlers.file_exception import FileNotFoundException
 from .helper import Helper
 from .file_service import FileService
+from src.redis.redis_service import RedisService
 
 logger = logging.getLogger("chat")
 
 
 class ChatService:
-	def __init__(self, session: AsyncSession):
+	def __init__(self, session: AsyncSession, redis_service: RedisService):
 		self.session = session
 		self.user_repo = UserRepository(session=self.session)
 		self.chat_repo = ChatRepository(session=self.session, user_repo=self.user_repo)
 		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 		self.helper = Helper(session=self.session)
 		self.file_service = FileService()
+		self.redis = redis_service
 
 	async def create_private_chat(self, phone_number: str, current_user: User) -> ChatResponse:
 		user_id = await self.user_repo.get_user_id_by_phone_number(phone_number=phone_number)
@@ -321,7 +324,16 @@ class ChatService:
 		return ChatResponse.model_validate(chat)
 
 	async def get_user_chats(self, user: User) -> list[ChatResponse]:
-		# implement redis service
+		cached_data = await self.redis.get("chat:all")
+
+		if cached_data:
+			logger.info("Chats fetched from Redis cached")
+
+			return [
+				ChatResponse.model_validate(item)
+				for item in json.loads(cached_data)
+			]
+		
 		chat_participants = await self.chat_participant_repo.get_user_participant_in_chats(userId=user.id)
 
 		chat_ids = [
@@ -331,12 +343,26 @@ class ChatService:
 
 		chats = await self.chat_repo.get_chats_by_ids(chatIds=chat_ids, current_user_id=user.id)
 
+		serialized = [
+			ChatResponse.model_validate(chat).model_dump(mode="json")
+			for chat in chats
+		]
+
+		await self.redis.set(
+			"chat:all",
+			json.dumps(serialized),
+			expire_seconds=300
+		)
+
 		logger.info(
 			"Successful chat responses",
 			extra={"user_id": str(user.id)}
 		)
 
-		return chats
+		return [
+			ChatResponse.model_validate(chat)
+			for chat in chats
+		]
 
 	async def get_chat_avatar_image(self, chat_id: UUID, user_id: UUID) -> FileResponse:
 		chat = await self.helper.get_chat_or_404(chatId=chat_id)

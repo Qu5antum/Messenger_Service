@@ -285,6 +285,7 @@ class MessageService:
             raise DatabaseException("Database error, message not deleted")
 
     async def get_messages_in_chat(self, chatId: UUID, user: User) -> list[MessageResponse]:
+        # implement redis service
         await self.helper.get_chat_or_404(chatId=chatId)
 
         await self.helper.get_participant_or_400(userId=user.id, chatId=chatId)

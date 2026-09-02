@@ -6,6 +6,9 @@ from src.database.models import User, UserRole
 from src.services.chat_service import ChatService
 from src.api.schemas.chat_schema import ChatResponse, ChatCreate, ChatUpdate, CommonChatResponse
 from src.api.dependencies.require_role_dependency import require_roles
+from src.redis.redis_service import RedisService
+
+redis_service = RedisService()
 
 
 chat_route = APIRouter(
@@ -14,7 +17,7 @@ chat_route = APIRouter(
 )
 
 async def get_chat_service(session: AsyncSession = Depends(get_session)):
-	return ChatService(session=session)
+	return ChatService(session=session, redis_service=redis_service)
 
 
 @chat_route.post("/chat/private_chat/create", response_model=ChatResponse, status_code=201)

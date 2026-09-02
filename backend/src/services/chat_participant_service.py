@@ -1,6 +1,7 @@
 import logging
 from uuid import UUID
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+import json
 
 from src.database.db import AsyncSession
 from src.database.models import User
@@ -13,18 +14,20 @@ from src.exception_handlers.db_exception import DatabaseException
 from src.api.schemas.chat_schema import ChatParticipantResponse
 from .helper import Helper
 from .file_service import FileService
+from src.redis.redis_service import RedisService
 
 logger = logging.getLogger("chat_participant")
 
 
 class ChatParticipantService:
-	def __init__(self, sesison: AsyncSession):
+	def __init__(self, sesison: AsyncSession, redis_service: RedisService):
 		self.session = sesison
 		self.user_repo = UserRepository(session=self.session)
 		self.chat_repo = ChatRepository(session=self.session, user_repo=self.user_repo)
 		self.chat_participant_repo = ChatParticipantRepository(session=self.session)
 		self.helper = Helper(session=self.session)
 		self.file_service = FileService()
+		self.redis = redis_service
 
 	async def add_participant_to_group_chat(self, chatId: UUID, phone_number: str, current_user: User) -> dict[str, str]:
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
@@ -181,7 +184,16 @@ class ChatParticipantService:
 			raise DatabaseException("Database error, pariticpant not removed")
 
 	async def get_participants_on_group_chat(self, chatId: UUID, user: User) -> list[ChatParticipantResponse]:
-		# implement redis service
+		cached_data = await self.redis.get("participant:all")
+
+		if cached_data:
+			logger.info("Participants fetched from Redis cache")
+
+			return [
+				ChatParticipantResponse.model_validate(item)
+				for item in json.loads(cached_data)
+			]
+
 		chat = await self.helper.get_chat_or_404(chatId=chatId)
 
 		if not chat.is_group:
@@ -196,12 +208,26 @@ class ChatParticipantService:
 
 		participants = await self.chat_participant_repo.get_participants(chatId=chatId)
 
+		serialized = [
+			ChatParticipantResponse.model_validate(participant).model_dump(mode="json")
+			for participant in participants
+		]
+
+		await self.redis.set(
+			"participant:all",
+			json.dumps(serialized),
+			expire_seconds=300
+		)
+
 		logger.info(
 			"Successful response of participants in chat",
 			extra={"chat_id": str(chatId)}
 		)
 
-		return participants
+		return [
+			ChatParticipantResponse.model_validate(participant)
+			for participant in participants
+		]
 
 	async def leave_chat(self, chatId: UUID, current_user: User) -> dict[str, str]: 
 		try:

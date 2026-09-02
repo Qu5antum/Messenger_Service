@@ -6,6 +6,9 @@ from src.database.models import User, UserRole
 from src.api.dependencies.require_role_dependency import require_roles
 from src.services.chat_participant_service import ChatParticipantService
 from src.api.schemas.chat_schema import ChatParticipantResponse
+from src.redis.redis_service import RedisService
+
+redis_service = RedisService()
 
 
 chat_participant_route = APIRouter(
@@ -14,7 +17,7 @@ chat_participant_route = APIRouter(
 )
 
 async def get_chat_participant_service(session: AsyncSession = Depends(get_session)):
-    return ChatParticipantService(sesison=session)
+    return ChatParticipantService(sesison=session, redis_service=redis_service)
 
 
 @chat_participant_route.post("/chat/{chat_id}/add_participant", status_code=201)
