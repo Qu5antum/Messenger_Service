@@ -307,7 +307,6 @@ class ChatService:
 			raise DatabaseException("Database error, chat not deleted")
 
 	async def get_chat_by_id(self, chatId: UUID, user: User) -> ChatResponse: 
-		# implement redis service
 		await self.helper.get_chat_or_404(chatId=chatId)
 
 		await self.helper.get_participant_or_400(userId=user.id, chatId=chatId)
@@ -365,6 +364,7 @@ class ChatService:
 		)
 
 	async def get_users_common_groups(self, user_id: UUID, current_user_id: UUID) -> list[CommonChatResponse]:
+		#implement redis service
 		chats = await self.chat_repo.get_users_common_chat_by_user_ids(user_id=user_id, current_user_id=current_user_id)
 
 		logger.info("Successful response of common chat of users")

@@ -6,6 +6,9 @@ from src.services.user_service import UserService
 from src.api.schemas.user_schema import UserOut, UserUpdate
 from src.database.models import User, UserRole
 from src.api.dependencies.require_role_dependency import require_roles
+from src.redis.redis_service import RedisService
+
+redis_service = RedisService()
 
 
 user_route = APIRouter(
@@ -14,7 +17,7 @@ user_route = APIRouter(
 )
 
 async def get_user_service(session: AsyncSession = Depends(get_session)):
-    return UserService(session=session)
+    return UserService(session=session, redis_service=redis_service)
 
 
 @user_route.get("/user", response_model=UserOut, status_code=200)

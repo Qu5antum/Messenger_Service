@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
 from pathlib import Path
+import json
 
 from src.database.db import AsyncSession
 from src.api.schemas.user_schema import UserOut, UserUpdate
@@ -13,16 +14,18 @@ from src.exception_handlers.db_exception import DatabaseException
 from src.services.file_service import FileService
 from .helper import Helper
 from src.exception_handlers.file_exception import FileNotFoundException
+from src.redis.redis_service import RedisService
 
 logger = logging.getLogger("user")
 
 
 class UserService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, redis_service: RedisService):
         self.session = session
         self.user_repo = UserRepository(session=self.session)
         self.file_service = FileService()
         self.helper = Helper(session=self.session)
+        self.redis = redis_service
 
     async def get_user_by_phone_number(self, phone_number: str) -> UserOut:
         user = await self.user_repo.get_user_by_phone_number(phone_number=phone_number)
@@ -40,11 +43,26 @@ class UserService:
         return user
 
     async def get_user_by_id(self, user_id: UUID) -> UserOut:
+        cached_data = await self.redis.get(f"user:{user_id}")
+
+        if cached_data:
+            logger.info("User fetched from Redis cached")
+
+            return UserOut.model_validate(json.loads(cached_data))
+        
         user = await self.helper.get_user_obj_or_404(user_id=user_id)
+
+        serialized = UserOut.model_validate(user).model_dump(mode="json")
+
+        await self.redis.set(
+            f"user:{user_id}",
+            json.dumps(serialized),
+            expire_seconds=300
+        )
 
         logger.info("Successful response of user by id")
 
-        return user
+        return UserOut.model_validate(user)
 
     async def update_profile(self, current_user_id: UUID, user_update: UserUpdate, avatar_file: UploadFile | None = None) -> dict[str, str]:
         user = await self.helper.get_user_obj_or_404(user_id=current_user_id)
