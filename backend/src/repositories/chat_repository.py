@@ -1,11 +1,11 @@
 from uuid import UUID
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from src.database.db import AsyncSession
 from .base_repository import BaseRepository
 from src.repositories.user_repository import UserRepository
-from src.database.models import Chat
+from src.database.models import Chat, ChatParticipant
 
 
 class ChatRepository(BaseRepository):
@@ -99,3 +99,20 @@ class ChatRepository(BaseRepository):
 			chat.chat_avatar_url = user_avatar_url
 
 		return chat
+
+	async def get_users_common_chat_by_user_ids(self, user_id: UUID, current_user_id: UUID):
+		result = await self.session.execute(
+			select(self.model)
+			.join(self.model.chat_participants)
+			.where(
+				ChatParticipant.user_id.in_([user_id, current_user_id]),
+				self.model.is_group.is_(True)
+			)
+			.having(
+				func.count(func.distinct(ChatParticipant.user_id)) == 2
+			)
+			.group_by(self.model.id)
+			.options(selectinload(self.model.chat_participants).options(selectinload(ChatParticipant.user)))
+		)
+
+		return result.scalars().all()

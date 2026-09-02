@@ -7,7 +7,7 @@ from pathlib import Path
 
 from src.database.db import AsyncSession
 from src.database.models import User
-from src.api.schemas.chat_schema import ChatCreate, ChatResponse, ChatUpdate
+from src.api.schemas.chat_schema import ChatCreate, ChatResponse, ChatUpdate, CommonChatResponse
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.user_repository import UserRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
@@ -363,3 +363,10 @@ class ChatService:
 			path=file_path,
 			media_type="image/*"
 		)
+
+	async def get_users_common_groups(self, user_id: UUID, current_user_id: UUID) -> list[CommonChatResponse]:
+		chats = await self.chat_repo.get_users_common_chat_by_user_ids(user_id=user_id, current_user_id=current_user_id)
+
+		logger.info("Successful response of common chat of users")
+
+		return chats

@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from uuid import UUID
 
-from .user_schema import UserOut
+from .user_schema import UserOut, CommonChatUserOut
 
 
 class ChatCreate(BaseModel):
@@ -34,5 +34,17 @@ class ChatParticipantResponse(BaseModel):
 	user_id: UUID
 	joined_at: datetime
 	user: UserOut
+
+	model_config = ConfigDict(from_attributes=True)
+
+
+class CommonChatParticipantResponse(BaseModel):
+	user: CommonChatUserOut
+
+
+class CommonChatResponse(BaseModel):
+	id: UUID
+	title: str
+	chat_participants: list[CommonChatParticipantResponse]
 
 	model_config = ConfigDict(from_attributes=True)

@@ -4,7 +4,7 @@ from uuid import UUID
 from src.database.db import AsyncSession, get_session
 from src.database.models import User, UserRole
 from src.services.chat_service import ChatService
-from src.api.schemas.chat_schema import ChatResponse, ChatCreate, ChatUpdate
+from src.api.schemas.chat_schema import ChatResponse, ChatCreate, ChatUpdate, CommonChatResponse
 from src.api.dependencies.require_role_dependency import require_roles
 
 
@@ -94,3 +94,12 @@ async def get_chat(
 	chatService: ChatService = Depends(get_chat_service)
 ):
 	return await chatService.get_chat_by_id(chatId=chat_id, user=user)
+
+
+@chat_route.get("/user/{user_id}/chat/all", response_model=list[CommonChatResponse], status_code=200)
+async def get_users_common_chats(
+	user_id: UUID,
+	user: User = Depends(require_roles(UserRole.ADMIN, UserRole.USER)),
+	chatService: ChatService = Depends(get_chat_service)
+):
+	return await chatService.get_users_common_groups(user_id=user_id, current_user_id=user.id)

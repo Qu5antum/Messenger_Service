@@ -34,4 +34,8 @@ class UserUpdate(BaseModel):
     username: Optional[str] = None
     phone_number: Optional[str] = None
     description: Optional[str] = None
+
+
+class CommonChatUserOut(BaseModel):
+    username: str
     
