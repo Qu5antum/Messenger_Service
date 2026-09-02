@@ -9,9 +9,9 @@ import {
 } from 'react-router-dom'
 
 import {
-    getUserProfile,
+    getCurrentUserProfile,
     updateProfile,
-    getUserAvatar
+    getCurrentUserAvatar
 } from '../api/users'
 
 type UserProfile = {
@@ -79,7 +79,7 @@ export default function UserProfile() {
     // =========================================
 
     const loadAvatar = async () => {
-        const url = await getUserAvatar()
+        const url = await getCurrentUserAvatar()
         replaceAvatarUrl(url)
     }
 
@@ -93,7 +93,7 @@ export default function UserProfile() {
                 setLoading(true)
                 setError(null)
 
-                const user = await getUserProfile()
+                const user = await getCurrentUserProfile()
 
                 setProfile(user)
                 setUsername(user.username || '')

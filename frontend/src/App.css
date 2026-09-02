@@ -1031,3 +1031,66 @@ button:disabled {
 .profile-back-button:active {
     transform: translateY(1px);
 }
+
+.participant {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.participant-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.participant-info:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.participant-avatar {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e5e7eb;
+    color: #374151;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.participant-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.participant-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.participant-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.participant-current {
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+.participant-remove {
+    flex-shrink: 0;
+}
