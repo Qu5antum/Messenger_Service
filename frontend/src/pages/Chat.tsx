@@ -1083,9 +1083,12 @@ export default function Chat() {
     const handleParticipantClick = (
         userId: string
     ) => {
-        navigate(
-            `/profile/${userId}`
-        )
+        if (userId === currentUserId) {
+            navigate('/profile')
+            return
+        }
+
+        navigate(`/profile/${userId}`)
     }
 
     const getParticipantName = (

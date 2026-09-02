@@ -69,6 +69,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<UserProfile />}/>
+            <Route path="/profile/:userId" element={<UserProfile />}/>
 
             <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
               <Route index element={<EmptyChatWelcome />} />
