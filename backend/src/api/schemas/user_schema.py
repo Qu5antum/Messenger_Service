@@ -38,4 +38,5 @@ class UserUpdate(BaseModel):
 
 class CommonChatUserOut(BaseModel):
     username: str
-    
+
+    model_config = ConfigDict(from_attributes=True)

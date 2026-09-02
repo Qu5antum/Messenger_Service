@@ -4,6 +4,7 @@ import logging
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import UploadFile
 from datetime import datetime, timezone
+import json
 
 from src.database.db import AsyncSession
 from src.database.models import User, MessageType
@@ -22,11 +23,12 @@ logger = logging.getLogger("message")
 
 
 class MessageService:
-    def __init__(self, session: AsyncSession, redis: RedisService):
+    def __init__(self, session: AsyncSession, redis_service: RedisService):
         self.session = session
         self.message_repo = MessageRepository(session=self.session)
         self.helper = Helper(session=self.session)
-        self.chat_pub = ChatPublisher(redis=redis)
+        self.redis = redis_service
+        self.chat_pub = ChatPublisher(redis=self.redis)
         self.attachment_repo = MessageAttachmentRepository(session=self.session)
         self.file_service = FileService()
         self.attachment_service = MessageAttachmentService(session=self.session)
@@ -285,7 +287,16 @@ class MessageService:
             raise DatabaseException("Database error, message not deleted")
 
     async def get_messages_in_chat(self, chatId: UUID, user: User) -> list[MessageResponse]:
-        # implement redis service
+        cached_data = await self.redis.get("message:all")
+
+        if cached_data:
+            logger.info("Messages fetched from Redis cache")
+
+            return [
+                MessageResponse.model_validate(item)
+                for item in json.loads(cached_data)
+            ]
+
         await self.helper.get_chat_or_404(chatId=chatId)
 
         await self.helper.get_participant_or_400(userId=user.id, chatId=chatId)
@@ -297,7 +308,21 @@ class MessageService:
             extra={"chat_id": str(chatId)}
         )
 
-        return messages
+        serialized = [
+            MessageResponse.model_validate(message).model_dump(mode="json")
+            for message in messages
+        ]
+
+        await self.redis.set(
+            "message:all",
+            json.dumps(serialized),
+            expire_seconds=300
+        )
+
+        return [
+            MessageResponse.model_validate(message)
+            for message in messages
+        ]
 
     async def get_message(self, messageId: UUID, user: User) -> MessageResponse:
         message = await self.helper.get_message_or_404(messageId=messageId)

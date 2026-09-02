@@ -390,9 +390,32 @@ class ChatService:
 		)
 
 	async def get_users_common_groups(self, user_id: UUID, current_user_id: UUID) -> list[CommonChatResponse]:
-		#implement redis service
+		cached_data = await self.redis.get("common_chat:all")
+
+		if cached_data:
+			logger.info("Common chats fetched from Redis cache")
+
+			return [
+				CommonChatResponse.model_validate(item)
+				for item in json.loads(cached_data)
+			]
+		
 		chats = await self.chat_repo.get_users_common_chat_by_user_ids(user_id=user_id, current_user_id=current_user_id)
+
+		serialized = [
+			CommonChatResponse.model_validate(chat).model_dump(mode="json")
+			for chat in chats
+		]
+
+		await self.redis.set(
+			"common_chat:all",
+			json.dumps(serialized),
+			expire_seconds=300
+		)
 
 		logger.info("Successful response of common chat of users")
 
-		return chats
+		return [
+			CommonChatResponse.model_validate(chat)
+			for chat in chats
+		]

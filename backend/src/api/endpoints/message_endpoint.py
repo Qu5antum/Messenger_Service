@@ -18,7 +18,7 @@ message_route = APIRouter(
 redis_service = RedisService()
 
 async def get_message_service(session: AsyncSession = Depends(get_session)):
-    return MessageService(session=session, redis=redis_service)
+    return MessageService(session=session, redis_service=redis_service)
 
 
 @message_route.post("/chat/{chat_id}/message/send", response_model=MessageResponse, status_code=201)

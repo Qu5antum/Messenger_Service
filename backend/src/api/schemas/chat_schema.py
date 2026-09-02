@@ -41,6 +41,7 @@ class ChatParticipantResponse(BaseModel):
 class CommonChatParticipantResponse(BaseModel):
 	user: CommonChatUserOut
 
+	model_config = ConfigDict(from_attributes=True)
 
 class CommonChatResponse(BaseModel):
 	id: UUID
