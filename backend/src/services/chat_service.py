@@ -324,7 +324,7 @@ class ChatService:
 		return ChatResponse.model_validate(chat)
 
 	async def get_user_chats(self, user: User) -> list[ChatResponse]:
-		cached_data = await self.redis.get("chat:all")
+		cached_data = await self.redis.get(f"chat:{user.id}")
 
 		if cached_data:
 			logger.info("Chats fetched from Redis cached")
@@ -349,9 +349,9 @@ class ChatService:
 		]
 
 		await self.redis.set(
-			"chat:all",
+			f"chat:{user.id}",
 			json.dumps(serialized),
-			expire_seconds=60
+			expire_seconds=15
 		)
 
 		logger.info(
@@ -398,7 +398,7 @@ class ChatService:
 
 			raise SelfActionNotAllowedException("User can't get own common groups")
 
-		cached_data = await self.redis.get("common_chat:all")
+		cached_data = await self.redis.get(f"common_chat:{user_id}")
 
 		if cached_data:
 			logger.info("Common chats fetched from Redis cache")
@@ -418,7 +418,7 @@ class ChatService:
 		await self.redis.set(
 			"common_chat:all",
 			json.dumps(serialized),
-			expire_seconds=60
+			expire_seconds=15
 		)
 
 		logger.info("Successful response of common chat of users")

@@ -57,7 +57,7 @@ class UserService:
         await self.redis.set(
             f"user:{user_id}",
             json.dumps(serialized),
-            expire_seconds=60
+            expire_seconds=15
         )
 
         logger.info("Successful response of user by id")

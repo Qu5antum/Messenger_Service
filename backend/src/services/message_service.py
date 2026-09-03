@@ -287,7 +287,7 @@ class MessageService:
             raise DatabaseException("Database error, message not deleted")
 
     async def get_messages_in_chat(self, chatId: UUID, user: User) -> list[MessageResponse]:
-        cached_data = await self.redis.get("message:all")
+        cached_data = await self.redis.get(f"message:{chatId}")
 
         if cached_data:
             logger.info("Messages fetched from Redis cache")
@@ -314,9 +314,9 @@ class MessageService:
         ]
 
         await self.redis.set(
-            "message:all",
+            f"message:{chatId}",
             json.dumps(serialized),
-            expire_seconds=60
+            expire_seconds=15
         )
 
         return [

@@ -184,7 +184,7 @@ class ChatParticipantService:
 			raise DatabaseException("Database error, pariticpant not removed")
 
 	async def get_participants_on_group_chat(self, chatId: UUID, user: User) -> list[ChatParticipantResponse]:
-		cached_data = await self.redis.get("participant:all")
+		cached_data = await self.redis.get(f"participant:{chatId}")
 
 		if cached_data:
 			logger.info("Participants fetched from Redis cache")
@@ -214,9 +214,9 @@ class ChatParticipantService:
 		]
 
 		await self.redis.set(
-			"participant:all",
+			f"participant:{chatId}",
 			json.dumps(serialized),
-			expire_seconds=60
+			expire_seconds=15
 		)
 
 		logger.info(

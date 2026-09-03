@@ -24,7 +24,7 @@ websocket_route = APIRouter(
 )
 
 async def get_message_service(session: AsyncSession = Depends(get_session)):
-    return MessageService(session=session, redis=redis_service)
+    return MessageService(session=session, redis_service=redis_service)
 
 def get_websocket_service(message_service: MessageService = Depends(get_message_service)):
     return WebsocketService(manager=manager, message_service=message_service)
