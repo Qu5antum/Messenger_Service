@@ -12,7 +12,7 @@ from src.api.schemas.chat_schema import ChatCreate, ChatResponse, ChatUpdate, Co
 from src.repositories.chat_repository import ChatRepository
 from src.repositories.user_repository import UserRepository
 from src.repositories.chat_participant_repository import ChatParticipantRepository
-from src.exception_handlers.user_exceptions import UserNotFoundException
+from src.exception_handlers.user_exceptions import UserNotFoundException, SelfActionNotAllowedException
 from src.exception_handlers.chat_exception import ChatIsNotGroupException, InvalidChatCreationException
 from src.exception_handlers.db_exception import DatabaseException
 from src.exception_handlers.file_exception import FileNotFoundException
@@ -351,7 +351,7 @@ class ChatService:
 		await self.redis.set(
 			"chat:all",
 			json.dumps(serialized),
-			expire_seconds=300
+			expire_seconds=60
 		)
 
 		logger.info(
@@ -390,6 +390,14 @@ class ChatService:
 		)
 
 	async def get_users_common_groups(self, user_id: UUID, current_user_id: UUID) -> list[CommonChatResponse]:
+		if user_id == current_user_id:
+			logger.warning(
+				"User can't get own common groups",
+				extra={"user_id": str(current_user_id)}
+			)
+
+			raise SelfActionNotAllowedException("User can't get own common groups")
+
 		cached_data = await self.redis.get("common_chat:all")
 
 		if cached_data:
@@ -410,7 +418,7 @@ class ChatService:
 		await self.redis.set(
 			"common_chat:all",
 			json.dumps(serialized),
-			expire_seconds=300
+			expire_seconds=60
 		)
 
 		logger.info("Successful response of common chat of users")

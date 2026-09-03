@@ -27,3 +27,8 @@ class UserAlreadyParticipantInChatException(BaseAppException):
 class UserNotParticipantInChatException(BaseAppException):
     def __init__(self, message: str):
         super().__init__(message, status_code=400)
+
+
+class SelfActionNotAllowedException(BaseAppException):
+    def __init__(self, message: str):
+        super().__init__(message, status_code=400)

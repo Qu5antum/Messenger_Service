@@ -216,7 +216,7 @@ class ChatParticipantService:
 		await self.redis.set(
 			"participant:all",
 			json.dumps(serialized),
-			expire_seconds=300
+			expire_seconds=60
 		)
 
 		logger.info(

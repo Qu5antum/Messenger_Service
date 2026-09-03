@@ -129,3 +129,6 @@ export const removeParticipant = (chatId: string, userId: string) =>
 
 export const leaveChat = (chatId: string) =>
     api.delete(`/api/chat/${chatId}/leave`).then(r => r.data)
+
+export const getUsersCommonChats = (userId: string) =>
+    api.get(`/api/user/${userId}/chat/all`).then(r => r.data)

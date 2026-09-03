@@ -19,11 +19,28 @@ import {
     getUserAvatar,
 } from '../api/users'
 
+import { getUsersCommonChats } from '../api/chats'
+
 type UserProfile = {
     id: string
     username: string
     phone_number: string
     description?: string | null
+}
+
+type CommonChatUser = {
+    username?: string | null
+    phone_number?: string | null
+}
+
+type CommonChatParticipant = {
+    user?: CommonChatUser | null
+}
+
+type CommonChat = {
+    id: string
+    title: string
+    chat_participants: CommonChatParticipant[]
 }
 
 export default function UserProfile() {
@@ -65,6 +82,12 @@ export default function UserProfile() {
 
     const [previewUrl, setPreviewUrl] =
         useState<string | null>(null)
+
+    const [commonChats, setCommonChats] =
+        useState<CommonChat[]>([])
+
+    const [commonChatsLoading, setCommonChatsLoading] =
+        useState(false)
 
     const [loading, setLoading] =
         useState(true)
@@ -132,6 +155,30 @@ export default function UserProfile() {
         }
     }
 
+    const loadCommonChats = async (
+        targetUserId: string
+    ) => {
+        try {
+            setCommonChatsLoading(true)
+
+            const chats =
+                await getUsersCommonChats(
+                    targetUserId
+                )
+
+            setCommonChats(chats || [])
+        } catch (err) {
+            console.error(
+                'Common chats loading error:',
+                err
+            )
+
+            setCommonChats([])
+        } finally {
+            setCommonChatsLoading(false)
+        }
+    }
+
     useEffect(() => {
         if (!profileUserId) {
             setError(
@@ -160,12 +207,15 @@ export default function UserProfile() {
                 }
 
                 setProfile(user)
+
                 setUsername(
                     user.username || ''
                 )
+
                 setPhoneNumber(
                     user.phone_number || ''
                 )
+
                 setDescription(
                     user.description || ''
                 )
@@ -174,6 +224,14 @@ export default function UserProfile() {
                     profileUserId,
                     isOwnProfile
                 )
+
+                if (!isOwnProfile) {
+                    await loadCommonChats(
+                        profileUserId
+                    )
+                } else {
+                    setCommonChats([])
+                }
             } catch (err: any) {
                 if (cancelled) {
                     return
@@ -205,7 +263,10 @@ export default function UserProfile() {
         return () => {
             cancelled = true
         }
-    }, [profileUserId, isOwnProfile])
+    }, [
+        profileUserId,
+        isOwnProfile,
+    ])
 
     useEffect(() => {
         return () => {
@@ -243,7 +304,11 @@ export default function UserProfile() {
                 { replace: true }
             )
         }
-    }, [userId, currentUserId, navigate])
+    }, [
+        userId,
+        currentUserId,
+        navigate,
+    ])
 
     const handleAvatarChange = (
         event: ChangeEvent<HTMLInputElement>
@@ -305,10 +370,13 @@ export default function UserProfile() {
                 await updateProfile({
                     username:
                         username.trim(),
+
                     phoneNumber:
                         phoneNumber.trim(),
+
                     description:
                         description.trim(),
+
                     avatarFile:
                         selectedAvatar,
                 })
@@ -387,6 +455,16 @@ export default function UserProfile() {
             ?.charAt(0)
             .toUpperCase() ||
         '?'
+
+    const getParticipantName = (
+        participant: CommonChatParticipant
+    ) => {
+        return (
+            participant.user?.username ||
+            participant.user?.phone_number ||
+            'Пользователь'
+        )
+    }
 
     if (loading) {
         return (
@@ -514,8 +592,7 @@ export default function UserProfile() {
                             value={username}
                             onChange={(e) =>
                                 setUsername(
-                                    e.target
-                                        .value
+                                    e.target.value
                                 )
                             }
                             placeholder="Введите имя пользователя"
@@ -538,8 +615,7 @@ export default function UserProfile() {
                             }
                             onChange={(e) =>
                                 setPhoneNumber(
-                                    e.target
-                                        .value
+                                    e.target.value
                                 )
                             }
                             placeholder="+7..."
@@ -561,8 +637,7 @@ export default function UserProfile() {
                             }
                             onChange={(e) =>
                                 setDescription(
-                                    e.target
-                                        .value
+                                    e.target.value
                                 )
                             }
                             placeholder="Расскажите немного о себе"
@@ -598,7 +673,92 @@ export default function UserProfile() {
                         </button>
                     )}
                 </form>
+
+                {!isOwnProfile && (
+                    <div className="common-chats">
+                        <div className="common-chats-header">
+                            <h3>
+                                Общие группы
+                            </h3>
+
+                            <span>
+                                {commonChats.length}
+                            </span>
+                        </div>
+
+                        {commonChatsLoading ? (
+                            <div className="common-chats-loading">
+                                Загрузка общих групп...
+                            </div>
+                        ) : commonChats.length === 0 ? (
+                            <div className="common-chats-empty">
+                                У вас нет общих групп
+                            </div>
+                        ) : (
+                            <div className="common-chats-list">
+                                {commonChats.map(
+                                    (chat) => (
+                                        <div
+                                            key={
+                                                chat.id
+                                            }
+                                            className="common-chat"
+                                        >
+                                            <div className="common-chat-info">
+                                                <div className="common-chat-avatar">
+                                                    {chat.title
+                                                        ?.charAt(
+                                                            0
+                                                        )
+                                                        .toUpperCase() ||
+                                                        '?'}
+                                                </div>
+
+                                                <div className="common-chat-details">
+                                                    <h4>
+                                                        {
+                                                            chat.title
+                                                        }
+                                                    </h4>
+
+                                                    <span>
+                                                        {
+                                                            chat.chat_participants
+                                                                ?.length
+                                                        }{' '}
+                                                        участников
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="common-chat-participants">
+                                                {chat.chat_participants?.map(
+                                                    (
+                                                        participant,
+                                                        index
+                                                    ) => (
+                                                        <span
+                                                            key={`${chat.id}-${index}`}
+                                                            className="common-chat-participant"
+                                                        >
+                                                            {
+                                                                getParticipantName(
+                                                                    participant
+                                                                )
+                                                            }
+                                                        </span>
+                                                    )
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     )
 }
+
